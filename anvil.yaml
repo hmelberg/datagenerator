@@ -12,43 +12,31 @@ services:
   server_config: {}
 package_name: DataGenerator
 allow_embedding: false
-name: Clone of DataGenerator
+name: DataGenerator2
 runtime_options: {version: 2, client_version: '3', server_version: python3-full}
 metadata: {}
 startup_form: Front
 db_schema:
-- name: recipes
-  id: 56899
-  python_name: recipes
+- name: Users
+  id: 88468
+  python_name: users
   columns:
-    3oHtud2LTEs=:
-      name: base
-      type: string
-      admin_ui: {order: 1, width: 200}
-    6hpBbLKruZA=:
-      name: key
-      type: string
-      admin_ui: {order: 3, width: 200}
-    O44Uz+Gn+qk=:
-      name: name
+    GYIexubHtXY=:
+      name: registration_date
+      type: date
+      admin_ui: {order: 2, width: 200}
+    gUs_uXcAVPU=:
+      name: email
       type: string
       admin_ui: {order: 0, width: 200}
-    gcts+_o7Mag=:
-      name: column
-      type: string
-      admin_ui: {order: 0.5, width: 200}
-    goafVmoQqDc=:
-      name: specifically
-      type: string
-      admin_ui: {order: 2, width: 200}
-    x44wPYRhKk8=:
-      name: seed
-      type: number
-      admin_ui: {order: 5, width: 200}
-  access: {python_name: recipes, app_id: QZBXEWOMCCPQVFQZ, server: full, client: none,
-    table_id: 56899}
+    tHNxUwmi+VA=:
+      name: enabled
+      type: bool
+      admin_ui: {order: 1, width: 100}
+  access: {python_name: users, app_id: AZEGJ3CWU5TFK5UY, server: full, client: none,
+    table_mapping_name: null, table_mapping_id: null, table_id: 88468}
 - name: patterns
-  id: 50049
+  id: 88467
   python_name: patterns
   columns:
     elvljV53398=:
@@ -141,10 +129,40 @@ db_schema:
       name: include_at_startup
       type: bool
       admin_ui: {order: 13, width: 200}
-  access: {python_name: patterns, app_id: QZBXEWOMCCPQVFQZ, server: full, client: full,
-    table_id: 50049}
+  access: {python_name: patterns, app_id: AZEGJ3CWU5TFK5UY, server: full, client: full,
+    table_mapping_name: null, table_mapping_id: null, table_id: 88467}
+- name: recipes
+  id: 88471
+  python_name: recipes
+  columns:
+    3oHtud2LTEs=:
+      name: base
+      type: string
+      admin_ui: {order: 1, width: 200}
+    6hpBbLKruZA=:
+      name: key
+      type: string
+      admin_ui: {order: 3, width: 200}
+    O44Uz+Gn+qk=:
+      name: name
+      type: string
+      admin_ui: {order: 0, width: 200}
+    gcts+_o7Mag=:
+      name: column
+      type: string
+      admin_ui: {order: 0.5, width: 200}
+    goafVmoQqDc=:
+      name: specifically
+      type: string
+      admin_ui: {order: 2, width: 200}
+    x44wPYRhKk8=:
+      name: seed
+      type: number
+      admin_ui: {order: 5, width: 200}
+  access: {python_name: recipes, app_id: AZEGJ3CWU5TFK5UY, server: full, client: none,
+    table_mapping_name: null, table_mapping_id: null, table_id: 88471}
 - name: csv
-  id: 54886
+  id: 88470
   python_name: csv
   columns:
     0FFNcEVmraw=:
@@ -187,34 +205,16 @@ db_schema:
       name: name
       type: string
       admin_ui: {order: 0, width: 200}
-  access: {python_name: csv, app_id: QZBXEWOMCCPQVFQZ, server: full, client: search,
-    table_id: 54886}
+  access: {python_name: csv, app_id: AZEGJ3CWU5TFK5UY, server: full, client: search,
+    table_mapping_name: null, table_mapping_id: null, table_id: 88470}
 - name: info
-  id: 54885
+  id: 88469
   python_name: info
   columns:
     7NRphXpJ9Ro=:
       name: pattern_autoid_max
       type: number
       admin_ui: {order: 0, width: 200}
-  access: {python_name: info, app_id: QZBXEWOMCCPQVFQZ, server: full, client: none,
-    table_id: 54885}
-- name: Users
-  id: 54879
-  python_name: users
-  columns:
-    GYIexubHtXY=:
-      name: registration_date
-      type: date
-      admin_ui: {order: 2, width: 200}
-    gUs_uXcAVPU=:
-      name: email
-      type: string
-      admin_ui: {order: 0, width: 200}
-    tHNxUwmi+VA=:
-      name: enabled
-      type: bool
-      admin_ui: {order: 1, width: 100}
-  access: {python_name: users, app_id: QZBXEWOMCCPQVFQZ, server: full, client: none,
-    table_id: 54879}
+  access: {python_name: info, app_id: AZEGJ3CWU5TFK5UY, server: full, client: none,
+    table_mapping_name: null, table_mapping_id: null, table_id: 88469}
 renamed: true
