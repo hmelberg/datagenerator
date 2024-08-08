@@ -5,66 +5,42 @@ components:
   layout_properties: {slot: nav-right}
   components:
   - type: FlowPanel
-    properties: {role: null, spacing: medium, align: right, tooltip: '', border: '',
-      foreground: '', visible: true, spacing_above: small, spacing_below: small, background: ''}
+    properties: {role: null, spacing: medium, align: right, tooltip: '', border: '', foreground: '', visible: true, spacing_above: small, spacing_below: small, background: ''}
     name: flow_panel_2
     layout_properties: {grid_position: 'NHWZBC,AYATYF'}
     components:
     - type: Link
-      properties: {role: text, url: '', align: left, tooltip: '', border: '', foreground: '',
-        visible: false, text: OPTIONS, font_size: null, wrap_on: mobile, font: '',
-        col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '',
-        spacing_below: small, italic: false, background: '', bold: false, underline: false,
-        icon: ''}
+      properties: {role: text, url: '', align: left, tooltip: '', border: '', foreground: '', visible: false, text: OPTIONS, font_size: null, wrap_on: mobile, font: '', col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '', spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: link_2
       layout_properties: {}
     - type: Link
-      properties: {role: text, url: '', align: right, tooltip: '', border: '', foreground: '',
-        visible: true, text: ABOUT, font_size: null, wrap_on: mobile, font: '', col_spacing: medium,
-        spacing_above: small, icon_align: left, col_widths: '', spacing_below: small,
-        italic: false, background: '', bold: false, underline: false, icon: 'fa:info'}
+      properties: {role: text, url: '', align: right, tooltip: '', border: '', foreground: '', visible: true, text: ABOUT, font_size: null, wrap_on: mobile, font: '', col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '', spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:info'}
       name: about
       layout_properties: {grid_position: 'NHWZBC,LEHPUJ'}
       event_bindings: {click: about_click}
     - type: Link
-      properties: {role: null, url: '', align: left, tooltip: '', border: '', foreground: '',
-        visible: false, text: HOME, font_size: 12, wrap_on: mobile, font: '', col_spacing: medium,
-        spacing_above: small, icon_align: left, col_widths: '', spacing_below: small,
-        italic: false, background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, url: '', align: left, tooltip: '', border: '', foreground: '', visible: false, text: HOME, font_size: 12, wrap_on: mobile, font: '', col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '', spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: home
       layout_properties: {}
       event_bindings: {click: home_click}
     - type: Link
-      properties: {role: text, url: '', align: left, tooltip: '', border: '', foreground: '',
-        visible: false, text: ACCOUNT, font_size: null, wrap_on: mobile, font: '',
-        col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '{}',
-        spacing_below: small, italic: false, background: '', bold: false, underline: false,
-        icon: ''}
+      properties: {role: text, url: '', align: left, tooltip: '', border: '', foreground: '', visible: false, text: ACCOUNT, font_size: null, wrap_on: mobile, font: '', col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '{}', spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: link_5
       layout_properties: {grid_position: 'NHWZBC,CVKTEH'}
       event_bindings: {hide: Single}
       components: []
     - type: Link
-      properties: {role: text, url: '', align: right, tooltip: '', border: '', foreground: '',
-        visible: false, text: SIGN IN, font_size: null, wrap_on: mobile, font: '',
-        col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '{}',
-        spacing_below: small, italic: false, background: '', bold: false, underline: false,
-        icon: ''}
+      properties: {role: text, url: '', align: right, tooltip: '', border: '', foreground: '', visible: false, text: SIGN IN, font_size: null, wrap_on: mobile, font: '', col_spacing: medium, spacing_above: small, icon_align: left, col_widths: '{}', spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: link_4_copy
       layout_properties: {grid_position: 'NHWZBC,GGMTDJ'}
       event_bindings: {hide: Single}
       components: []
 - type: Label
-  properties: {role: headline, align: left, tooltip: '', border: '', foreground: '',
-    visible: true, text: 'Medical Data Generator: Create data for testing and teaching',
-    font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small,
-    italic: false, background: '', bold: false, underline: false, icon: ''}
+  properties: {role: headline, align: left, tooltip: '', border: '', foreground: '', visible: true, text: 'Medical Data Generator: Create data for testing and teaching', font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
   name: label_1
   layout_properties: {slot: title}
 - type: ColumnPanel
-  properties: {role: null, tooltip: '', border: '', foreground: '', visible: true,
-    wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}',
-    spacing_below: none, background: ''}
+  properties: {role: null, tooltip: '', border: '', foreground: '', visible: true, wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}', spacing_below: none, background: ''}
   name: add_code_column
   layout_properties: {slot: default}
   components:
@@ -79,32 +55,37 @@ components:
       layout_properties: {grid_position: 'PTCQIO,FVLNIH'}
       components:
       - type: Label
-        properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-          visible: true, text: Data from health registries are sensitive and difficult to obtain. Sometimes the solution is to use artificial data that has the same structure as the real data. This app makes it possible to create such data.,
-          font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small,
-          italic: false, background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: Data from health registries are sensitive and difficult to obtain. Sometimes the solution is to use artificial data that has the same structure as the real data. This app makes it possible to create such data., font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: ingress
         layout_properties: {grid_position: 'EWURZE,TIRQVJ'}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: 'A lot of people like to pick on ICD10 for diagnosis
-          code V91.07XA - "Burn due to water skis on fire, initial encounter." But
-          I''ve always been fond of V97.33 "Sucked into jet engine."', font_size: 12,
-        font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: true,
-        background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: 'A lot of people like to pick on ICD10 for diagnosis code V91.07XA - "Burn due to water skis on fire, initial encounter." But I''ve always been fond of V97.33 "Sucked into jet engine."', font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: true, background: '', bold: false, underline: false, icon: ''}
       name: label_10
       layout_properties:
         col_widths: {}
         grid_position: FAVGQY,HCYVYY
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: '1. Select the type of variable you want to create
-
+      properties:
+        role: null
+        align: left
+        tooltip: ''
+        border: ''
+        foreground: ''
+        visible: true
+        text: |-
+          1. Select the type of variable you want to create
           2. Click OK to generate the column
-
-          3. Repeat 1 and 2 until you have the dataset you want', font_size: null,
-        font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false, icon: ''}
+          3. Repeat 1 and 2 until you have the dataset you want
+        font_size: null
+        font: ''
+        spacing_above: small
+        icon_align: left
+        spacing_below: small
+        italic: false
+        background: ''
+        bold: false
+        underline: false
+        icon: ''
       name: label_7
       layout_properties: {grid_position: 'QRXSHQ,ACKGHU'}
     - type: ColumnPanel
@@ -117,10 +98,7 @@ components:
       layout_properties: {grid_position: 'VPIHLE,OQDDRI'}
       components:
       - type: Label
-        properties: {role: title, align: left, tooltip: '', border: '', foreground: '',
-          visible: true, text: Generate a column, font_size: 18, font: '', spacing_above: small,
-          icon_align: left, spacing_below: small, italic: false, background: '', bold: true,
-          underline: false, icon: ''}
+        properties: {role: title, align: left, tooltip: '', border: '', foreground: '', visible: true, text: Generate a column, font_size: 18, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: true, underline: false, icon: ''}
         name: label_11
         layout_properties: {grid_position: 'GTIHGV,CHHRUB'}
         event_bindings: {hide: Single}
@@ -130,25 +108,16 @@ components:
         layout_properties: {grid_position: 'UVRIEG,VMMKGK'}
         components:
         - type: Label
-          properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-            visible: true, text: Add a column called, font_size: 14, font: '', spacing_above: small,
-            icon_align: left, spacing_below: small, italic: false, background: '',
-            bold: false, underline: false, icon: ''}
+          properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: Add a column called, font_size: 14, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
           name: label_14
           layout_properties: {}
         - type: TextBox
-          properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: name,
-            border: '', enabled: true, foreground: '', visible: true, text: '', font_size: 14,
-            font: '', spacing_above: small, type: text, spacing_below: small, italic: false,
-            background: '', bold: false, underline: false}
+          properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: name, border: '', enabled: true, foreground: '', visible: true, text: '', font_size: 14, font: '', spacing_above: small, type: text, spacing_below: small, italic: false, background: '', bold: false, underline: false}
           name: column_name
           layout_properties: {grid_position: 'MAKITB,UEJHNA BSKRRM,TPLLQL', width: 85.19999999999999}
           event_bindings: {pressed_enter: column_name_pressed_enter}
         - type: Label
-          properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-            visible: true, text: based on, font_size: null, font: '', spacing_above: small,
-            icon_align: left, spacing_below: small, italic: false, background: '',
-            bold: false, underline: false, icon: ''}
+          properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: based on, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
           name: label_15
           layout_properties: {}
         - type: DropDown
@@ -175,10 +144,7 @@ components:
           layout_properties: {grid_position: 'MAKITB,VOMMCY WPBGSA,UDBIKP'}
           event_bindings: {change: how_dropdown_change}
         - type: Label
-          properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-            visible: true, text: specifically, font_size: null, font: '', spacing_above: small,
-            icon_align: left, spacing_below: small, italic: false, background: '',
-            bold: false, underline: false, icon: ''}
+          properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: specifically, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
           name: label_21
           layout_properties: {}
         - type: DropDown
@@ -205,27 +171,17 @@ components:
           layout_properties: {grid_position: 'MAKITB,QCWRGH MREKLU,PTGQHK'}
           event_bindings: {change: how_specific_dropdown_change}
         - type: TextBox
-          properties: {role: null, align: left, hide_text: false, tooltip: '1234 -->
-              Four digit numbers. [A-D][1-3] --> A letter between A and D followed
-              by a number between 1 and three.mber.', placeholder: K50.1, border: 'False',
-            enabled: true, foreground: '', visible: false, text: '', font_size: null,
-            font: '', spacing_above: small, type: text, spacing_below: small, italic: false,
-            background: '', bold: false, underline: false}
+          properties: {role: null, align: left, hide_text: false, tooltip: '1234 --> Four digit numbers. [A-D][1-3] --> A letter between A and D followed by a number between 1 and three.mber.', placeholder: K50.1, border: 'False', enabled: true, foreground: '', visible: false, text: '', font_size: null, font: '', spacing_above: small, type: text, spacing_below: small, italic: false, background: '', bold: false, underline: false}
           name: how_specific_text
           layout_properties: {grid_position: 'MAKITB,QCWRGH MYTKMM,FTAQZM', width: 223.2}
           event_bindings: {}
       - type: FlowPanel
-        properties: {role: null, spacing: medium, align: right, tooltip: '', border: '',
-          foreground: '', visible: true, spacing_above: small, spacing_below: small,
-          background: ''}
+        properties: {role: null, spacing: medium, align: right, tooltip: '', border: '', foreground: '', visible: true, spacing_above: small, spacing_below: small, background: ''}
         name: flow_panel_3
         layout_properties: {grid_position: 'LUWLWE,QWGZYM'}
         components:
         - type: Button
-          properties: {role: primary-color, align: right, tooltip: '', border: '',
-            enabled: true, foreground: '', visible: true, text: '  OK', font_size: 14,
-            font: '', spacing_above: small, icon_align: left, spacing_below: small,
-            italic: false, background: '', bold: false, underline: false, icon: 'fa:bars'}
+          properties: {role: primary-color, align: right, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: '  OK', font_size: 14, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:bars'}
           name: generate_codes
           layout_properties: {slot: default, grid_position: 'LMSJGM,ZRVVHN'}
           event_bindings: {click: generate_codes_click}
@@ -235,10 +191,7 @@ components:
       layout_properties: {grid_position: 'QGGHRA,XEALBL'}
       components:
       - type: Label
-        properties: {role: title, align: left, tooltip: '', border: '', foreground: '',
-          visible: true, text: The result, font_size: 18, font: '', spacing_above: small,
-          icon_align: left, spacing_below: small, italic: false, background: '', bold: true,
-          underline: false, icon: ''}
+        properties: {role: title, align: left, tooltip: '', border: '', foreground: '', visible: true, text: The result, font_size: 18, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: true, underline: false, icon: ''}
         name: step_1_headline
         layout_properties: {grid_position: 'LSJSXZ,MKJLBB'}
       - type: FlowPanel
@@ -269,25 +222,17 @@ components:
           name: multiple
           layout_properties: {grid_position: 'MJALLR,NJVWFZ BYYFTO,FFRUCM'}
         - type: Button
-          properties: {role: primary-color, align: right, tooltip: '', border: '',
-            enabled: true, foreground: '', visible: true, text: '  OK', font_size: 14,
-            font: '', spacing_above: small, icon_align: left, spacing_below: small,
-            italic: false, background: '', bold: false, underline: false, icon: 'fa:table'}
+          properties: {role: primary-color, align: right, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: '  OK', font_size: 14, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:table'}
           name: ok_dataset
           layout_properties: {grid_position: 'BQEWNV,BCVHNE'}
           event_bindings: {click: ok_dataset_click}
       - type: FlowPanel
-        properties: {role: null, spacing: medium, align: right, tooltip: '', border: '',
-          foreground: '', visible: true, spacing_above: small, spacing_below: small,
-          background: ''}
+        properties: {role: null, spacing: medium, align: right, tooltip: '', border: '', foreground: '', visible: true, spacing_above: small, spacing_below: small, background: ''}
         name: flow_panel_4
         layout_properties: {grid_position: 'SREFJV,DJWUZH'}
         components:
         - type: TextBox
-          properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Enter a number for how many lines to generate,
-            border: '', enabled: true, foreground: '', visible: true, text: '100',
-            font_size: 14, font: '', spacing_above: small, type: number, spacing_below: small,
-            italic: false, background: '', bold: false, underline: false}
+          properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Enter a number for how many lines to generate, border: '', enabled: true, foreground: '', visible: true, text: '100', font_size: 14, font: '', spacing_above: small, type: number, spacing_below: small, italic: false, background: '', bold: false, underline: false}
           name: nrows
           layout_properties:
             col_widths: {}
@@ -299,10 +244,7 @@ components:
           layout_properties: {grid_position: 'ROLHJK,ULTOAB'}
           components: []
         - type: Button
-          properties: {role: primary-color, align: right, tooltip: '', border: '',
-            enabled: true, foreground: '', visible: true, text: csv, font_size: 14,
-            font: '', spacing_above: small, icon_align: left, spacing_below: small,
-            italic: false, background: '', bold: false, underline: false, icon: 'fa:download'}
+          properties: {role: primary-color, align: right, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: csv, font_size: 14, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:download'}
           name: download
           layout_properties: {grid_position: 'ROLHJK,DJFRCR', slot: default}
           event_bindings: {click: download_click}
@@ -343,98 +285,66 @@ components:
     name: spacer_3
     layout_properties: {grid_position: 'BMXDAY,IJXQHO'}
   - type: ColumnPanel
-    properties: {role: null, tooltip: '', border: '', foreground: '', visible: false,
-      wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}',
-      spacing_below: small, background: ''}
+    properties: {role: null, tooltip: '', border: '', foreground: '', visible: false, wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}', spacing_below: small, background: ''}
     name: generate_options_panel
     layout_properties: {grid_position: 'FZOVCG,ZKXVKH'}
     components:
     - type: Label
-      properties: {role: null, align: center, tooltip: '', border: '', foreground: '',
-        visible: true, text: Options controlling the creation of a column, font_size: 18,
-        font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-        background: '', bold: true, underline: false, icon: ''}
+      properties: {role: null, align: center, tooltip: '', border: '', foreground: '', visible: true, text: Options controlling the creation of a column, font_size: 18, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: true, underline: false, icon: ''}
       name: label_1_copy
       layout_properties:
         col_widths: {}
         grid_position: ZQBZQB,EGABEA
     - type: Button
-      properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-        foreground: '', visible: true, text: Include some missing values (%), font_size: null,
-        font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Include some missing values (%), font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: button_2
       layout_properties:
         col_widths: {}
         grid_position: KOPZAZ,YGTTCT
     - type: TextBox
-      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Percentage missing,
-        border: '', enabled: true, foreground: '', visible: true, text: '0', font_size: null,
-        font: '', spacing_above: small, type: number, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false}
+      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Percentage missing, border: '', enabled: true, foreground: '', visible: true, text: '0', font_size: null, font: '', spacing_above: small, type: number, spacing_below: small, italic: false, background: '', bold: false, underline: false}
       name: missing_pct
       layout_properties:
         col_widths: {}
         grid_position: KOPZAZ,HHGUWO
     - type: Button
-      properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-        foreground: '', visible: true, text: Include errors and invalid values (%),
-        font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small,
-        italic: false, background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Include errors and invalid values (%), font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: errors
       layout_properties:
         col_widths: {}
         grid_position: IIIGTX,AQDLHP
     - type: TextBox
-      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: '',
-        border: '', enabled: true, foreground: '', visible: true, text: '0', font_size: null,
-        font: '', spacing_above: small, type: number, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false}
+      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: '', border: '', enabled: true, foreground: '', visible: true, text: '0', font_size: null, font: '', spacing_above: small, type: number, spacing_below: small, italic: false, background: '', bold: false, underline: false}
       name: error_pct
       layout_properties:
         col_widths: {}
         grid_position: IIIGTX,TPKGGB
     - type: Button
-      properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-        foreground: '', visible: true, text: Seed value, font_size: null, font: '',
-        spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Seed value, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: button_1
       layout_properties:
         col_widths: {}
         grid_position: HBORKO,IDHCES
     - type: TextBox
-      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Enter a number,
-        border: '', enabled: true, foreground: '', visible: true, text: '', font_size: null,
-        font: '', spacing_above: small, type: text, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false}
+      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: Enter a number, border: '', enabled: true, foreground: '', visible: true, text: '', font_size: null, font: '', spacing_above: small, type: text, spacing_below: small, italic: false, background: '', bold: false, underline: false}
       name: seed_num
       layout_properties:
         col_widths: {}
         grid_position: HBORKO,LKXJQD
     - type: Button
-      properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-        foreground: '', visible: true, text: Missing value symbol, font_size: null,
-        font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false, icon: ''}
+      properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Missing value symbol, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: button_9
       layout_properties:
         col_widths: {}
         grid_position: WUXJDZ,FXTQDQ
     - type: TextBox
-      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: None (Blank),
-        border: '', enabled: true, foreground: '', visible: true, text: '', font_size: null,
-        font: '', spacing_above: small, type: text, spacing_below: small, italic: false,
-        background: '', bold: false, underline: false}
+      properties: {role: null, align: left, hide_text: false, tooltip: '', placeholder: None (Blank), border: '', enabled: true, foreground: '', visible: true, text: '', font_size: null, font: '', spacing_above: small, type: text, spacing_below: small, italic: false, background: '', bold: false, underline: false}
       name: text_box_6
       layout_properties:
         col_widths: {}
         grid_position: WUXJDZ,DYGYDT
     - type: RadioButton
-      properties: {role: null, selected: false, align: left, tooltip: '', border: '',
-        enabled: true, foreground: '', value: '', visible: true, text: Tie values to another column,
-        font_size: null, font: '', spacing_above: small, spacing_below: small, italic: false,
-        background: '', bold: false, group_name: radioGroup1, underline: false}
+      properties: {role: null, selected: false, align: left, tooltip: '', border: '', enabled: true, foreground: '', value: '', visible: true, text: Tie values to another column, font_size: null, font: '', spacing_above: small, spacing_below: small, italic: false, background: '', bold: false, group_name: radioGroup1, underline: false}
       name: tie_to_bool
       layout_properties: {grid_position: 'GLMBZO,PIQFNR'}
       event_bindings: {clicked: tie_to_bool_clicked}
@@ -445,10 +355,7 @@ components:
       data_bindings: []
       event_bindings: {change: tie_to_column_change}
     - type: Button
-      properties: {role: null, align: right, tooltip: '', border: '', enabled: true,
-        foreground: '', visible: true, text: OK, font_size: null, font: '', spacing_above: small,
-        icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-        underline: false, icon: ''}
+      properties: {role: null, align: right, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: OK, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: button_8_copy
       layout_properties:
         col_widths: {}
@@ -465,26 +372,18 @@ components:
     layout_properties: {grid_position: 'QFYYNP,ZQJYDU'}
     components:
     - type: ColumnPanel
-      properties: {role: null, tooltip: '', border: '', foreground: '', visible: false,
-        wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}',
-        spacing_below: small, background: ''}
+      properties: {role: null, tooltip: '', border: '', foreground: '', visible: false, wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{}', spacing_below: small, background: ''}
       name: column_panel_1_copy
       layout_properties: {grid_position: 'EVPSGS,CVFQOC'}
       components:
       - type: Label
-        properties: {role: null, align: center, tooltip: '', border: '', foreground: '',
-          visible: true, text: Actions, font_size: 18, font: '', spacing_above: small,
-          icon_align: left, spacing_below: small, italic: false, background: '', bold: true,
-          underline: false, icon: ''}
+        properties: {role: null, align: center, tooltip: '', border: '', foreground: '', visible: true, text: Actions, font_size: 18, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: true, underline: false, icon: ''}
         name: label_1_copy_3
         layout_properties:
           col_widths: {}
           grid_position: KHKBJI,VKABQT
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Store current pattern, font_size: null,
-          font: '', spacing_above: small, icon_align: left, spacing_below: small,
-          italic: false, background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Store current pattern, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_11
         layout_properties:
           col_widths: {}
@@ -496,10 +395,7 @@ components:
           col_widths: {}
           grid_position: MXNZFZ,KWHDWK
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Upload a list of codes, font_size: null,
-          font: '', spacing_above: small, icon_align: left, spacing_below: small,
-          italic: false, background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Upload a list of codes, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_12
         layout_properties:
           col_widths: {}
@@ -511,10 +407,7 @@ components:
           col_widths: {}
           grid_position: OGFCTC,VWNGZS
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Search for existing datasets, font_size: null,
-          font: '', spacing_above: small, icon_align: left, spacing_below: small,
-          italic: false, background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Search for existing datasets, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_13
         layout_properties:
           col_widths: {}
@@ -526,10 +419,7 @@ components:
           col_widths: {}
           grid_position: KZPXNW,BOUJDR
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Use an existing dataset, font_size: null,
-          font: '', spacing_above: small, icon_align: left, spacing_below: small,
-          italic: false, background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Use an existing dataset, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_14
         layout_properties:
           col_widths: {}
@@ -541,10 +431,7 @@ components:
           col_widths: {}
           grid_position: KAXEGB,XOHKOA
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Delete column, font_size: null, font: '',
-          spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-          background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Delete column, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_15
         layout_properties:
           col_widths: {}
@@ -556,10 +443,7 @@ components:
           col_widths: {}
           grid_position: FIJDXS,BCXUXH
       - type: Button
-        properties: {role: null, align: full, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: Clear output, font_size: null, font: '',
-          spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-          background: '', bold: false, underline: false, icon: ''}
+        properties: {role: null, align: full, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Clear output, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_17
         layout_properties:
           col_widths: {}
@@ -571,117 +455,107 @@ components:
           col_widths: {}
           grid_position: IUQSUO,WPVTYK
       - type: Button
-        properties: {role: null, align: right, tooltip: '', border: '', enabled: true,
-          foreground: '', visible: true, text: OK, font_size: null, font: '', spacing_above: small,
-          icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-          underline: false, icon: ''}
+        properties: {role: null, align: right, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: OK, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
         name: button_8_copy_2
         layout_properties:
           col_widths: {}
           grid_position: TFIPML,YHFILR
   - type: ColumnPanel
-    properties: {role: null, tooltip: '', border: '', foreground: '', visible: false,
-      wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{"PJIDAV":15,"IXHQWN":45,"FQWQGQ":15,"YAJHTB":45,"WBFGNL":15,"NRIHWG":45}',
-      spacing_below: small, background: ''}
+    properties: {role: null, tooltip: '', border: '', foreground: '', visible: false, wrap_on: mobile, col_spacing: medium, spacing_above: small, col_widths: '{"PJIDAV":15,"IXHQWN":45,"FQWQGQ":15,"YAJHTB":45,"WBFGNL":15,"NRIHWG":45}', spacing_below: small, background: ''}
     name: about_panel
     layout_properties: {grid_position: 'LBUHTU,KPWMOU'}
     components:
     - type: Label
-      properties: {role: null, align: center, tooltip: '', border: '', foreground: '',
-        visible: true, text: ' DataGenerator', font_size: 28, font: '', spacing_above: small,
-        icon_align: left, spacing_below: small, italic: false, background: '', bold: true,
-        underline: false, icon: ''}
+      properties: {role: null, align: center, tooltip: '', border: '', foreground: '', visible: true, text: ' DataGenerator', font_size: 28, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: true, underline: false, icon: ''}
       name: label_2
       layout_properties: {grid_position: 'QQLAAU,FAXEUG'}
     - type: Label
-      properties: {role: display-4, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: 'Why?', font_size: 22, font: '', spacing_above: small,
-        icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-        underline: false, icon: ''}
+      properties: {role: display-4, align: left, tooltip: '', border: '', foreground: '', visible: true, text: 'Why?', font_size: 22, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: label_9
       layout_properties: {grid_position: 'BUMMEE,PJIDAV'}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: 'Data from health registries are sensitive and difficult
-          to obtain. Sometimes the solution is to use artificial data that has the
-          same structure as the real data. This app makes it possible to create such
-          data.
+      properties:
+        role: null
+        align: left
+        tooltip: ''
+        border: ''
+        foreground: ''
+        visible: true
+        text: |-
+          Data from health registries are sensitive and difficult to obtain. Sometimes the solution is to use artificial data that has the same structure as the real data. This app makes it possible to create such data.
 
+          For students and teachers: To generate data that can be used when learning how to analyze health register data
 
-          For students and teachers: To generate data that can be used when learning
-          how to analyze health register data
+          For developers: To generate data that can be used to test libraries, databases and functions
 
-
-          For developers: To generate data that can be used to test libraries, databases
-          and functions
-
-
-          For researchers: Test hypotheses by comparing results from real and fake
-          data', font_size: 14, font: '', spacing_above: small, icon_align: left,
-        spacing_below: small, italic: false, background: '', bold: false, underline: false,
-        icon: ''}
+          For researchers: Test hypotheses by comparing results from real and fake data
+        font_size: 14
+        font: ''
+        spacing_above: small
+        icon_align: left
+        spacing_below: small
+        italic: false
+        background: ''
+        bold: false
+        underline: false
+        icon: ''
       name: ccc
       layout_properties: {grid_position: 'BUMMEE,IXHQWN'}
       event_bindings: {hide: Single}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: Workflow, font_size: 22, font: '', spacing_above: small,
-        icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-        underline: false, icon: ''}
+      properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: Workflow, font_size: 22, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: label_4
       layout_properties: {grid_position: 'HCTHMZ,FQWQGQ'}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: '1. Select the structure of the data file (or just leave
-          the defaults): Name, number of observations and whether each person has
-          only one or possible more than one event. For instance, in a database of
-          prescriptions the same person can have more than one event. In a database
-          of causes of deaths, the same person is seldom observed twice.
+      properties:
+        role: null
+        align: left
+        tooltip: ''
+        border: ''
+        foreground: ''
+        visible: true
+        text: |
+          1. Select the structure of the data file (or just leave the defaults): Name, number of observations and whether each person has only one or possible more than one event. For instance, in a database of prescriptions the same person can have more than one event. In a database of causes of deaths, the same person is seldom observed twice.
 
-
-          2. Click ''OK'' to make the values and add a new column to the dataset.
-          Repeat this step for additional columns.
-
+          2. Click 'OK' to make the values and add a new column to the dataset. Repeat this step for additional columns.
 
           3. View the results and download the result as a csv file.
-
-          ', font_size: 14, font: '', spacing_above: small, icon_align: left, spacing_below: small,
-        italic: false, background: '', bold: false, underline: false, icon: ''}
+        font_size: 14
+        font: ''
+        spacing_above: small
+        icon_align: left
+        spacing_below: small
+        italic: false
+        background: ''
+        bold: false
+        underline: false
+        icon: ''
       name: label_3
       layout_properties: {grid_position: 'HCTHMZ,YAJHTB', slot: default}
       event_bindings: {hide: Single}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: 'How?', font_size: 22, font: '', spacing_above: small,
-        icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-        underline: false, icon: ''}
+      properties: {role: null, align: left, tooltip: '', border: '', foreground: '', visible: true, text: 'How?', font_size: 22, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: ''}
       name: label_6
       layout_properties: {grid_position: 'WGHARX,WBFGNL'}
     - type: Label
-      properties: {role: null, align: left, tooltip: '', border: '', foreground: '',
-        visible: true, text: "To create a new column, the user first has to select\
-          \ how the content of the cells should be generated. \n\nThe easiest option\
-          \ is the use the predefined patterns which contains the general structure\
-          \ for many common medical codes as well as several other types of columns\
-          \ (date of birth etc).\n\nIf the deisred content in not found in the predefined\
-          \ pattern, you can choose between three user defined methods for generating\
-          \ cell content:\n\n1. Prove a simple example of a code\nFor instance, typing\
-          \ 'K50.1' will generate codes with one capital letter (between A and Z),\
-          \ two random digits, a full stop sign, and a random number.\n\n2. A user\
-          \ defined pattern. \nThis is useful if, for instance, you do not want the\
-          \ to allow all possible letters, but only a subset. In a pattern,  each\
-          \ position in the code is specified within brackets. \n\nFor instance: [a-n][1-3]\
-          \ will generate codes with lower case letters between a and n, followed\
-          \ by a number between 1 to 3. \n\nInstead of using hyphens, it is also possible\
-          \ to provide a list:[a,d,f][2,5] will generate codes starting with either\
-          \ a, d, or f, followed by the number 2 or 5. \n\nIt is also possible to\
-          \ make the different elements in a list have different probabilities. Example:\
-          \ [m,f;p=(0,51,0.49)] will generate a column with approximately 51% m's\
-          \ and 49% f's.\n\n3. Advanced users can also input a regex expression and\
-          \ the app will find random expressions that conform to the expression given.\
-          \ \n", font_size: null, font: '', spacing_above: small, icon_align: left,
-        spacing_below: small, italic: false, background: '', bold: false, underline: false,
-        icon: ''}
+      properties:
+        role: null
+        align: left
+        tooltip: ''
+        border: ''
+        foreground: ''
+        visible: true
+        text: "To create a new column, the user first has to select how the content of the cells should be generated. \n\nThe easiest option is the use the predefined patterns which contains the general structure for many common medical codes as well as several other types of columns (date of birth etc).\n\nIf the deisred content in not found in the predefined pattern, you can choose between three user defined methods for generating cell content:\n\n1. Prove a simple example of a code\nFor instance, typing 'K50.1' will generate codes with one capital letter (between A and Z), two random digits, a full stop sign, and a random number.\n\n2. A user defined pattern. \nThis is useful if, for instance, you do not want the to allow all possible letters, but only a subset. In a pattern,  each position in the code is specified within brackets. \n\nFor instance: [a-n][1-3] will generate codes with lower case letters between a and n, followed by a number between 1 to 3. \n\nInstead of using hyphens, it is also possible to provide a list:[a,d,f][2,5] will generate codes starting with either a, d, or f, followed by the number 2 or 5. \n\nIt is also possible to make the different elements in a list have different probabilities. Example: [m,f;p=(0,51,0.49)] will generate a column with approximately 51% m's and 49% f's.\n\n3. Advanced users can also input a regex expression and the app will find random expressions that conform to the expression given. \n"
+        font_size: null
+        font: ''
+        spacing_above: small
+        icon_align: left
+        spacing_below: small
+        italic: false
+        background: ''
+        bold: false
+        underline: false
+        icon: ''
       name: label_5
       layout_properties: {grid_position: 'WGHARX,NRIHWG'}
 - type: ColumnPanel
@@ -690,79 +564,51 @@ components:
   layout_properties: {slot: left-nav}
   components:
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: true, text: New Data, font_size: null, font: '', spacing_above: small,
-      icon_align: left, spacing_below: small, italic: false, background: '', bold: false,
-      underline: false, icon: 'fa:file-o'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: New Data, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:file-o'}
     name: new_file
     layout_properties: {grid_position: 'TZGUYF,WFZIHA'}
     event_bindings: {click: new_file_click}
   - type: Button
-    properties: {role: null, align: center, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: true, text: Get Existing Data, font_size: null, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:download'}
+    properties: {role: null, align: center, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Get Existing Data, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:download'}
     name: load_data
     layout_properties: {grid_position: 'PFHDCI,AMOOZZ'}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: false, text: ' Save data online', font_size: 12, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:cloud-upload'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: false, text: ' Save data online', font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:cloud-upload'}
     name: save_data
     layout_properties: {grid_position: 'IYYOFP,ORWGKV'}
     event_bindings: {click: save_data_click}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: false, text: Save pattern, font_size: 12, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:floppy-o'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: false, text: Save pattern, font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:floppy-o'}
     name: save_pattern
     layout_properties:
       col_widths: {}
       grid_position: TPTJYD,PZMMOA
     event_bindings: {click: save_pattern_click}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: true, text: Delete column, font_size: null, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:eraser'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: true, text: Delete column, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:eraser'}
     name: delete_column
     layout_properties:
       col_widths: {}
       grid_position: BXZTUF,XVNBTE
     event_bindings: {click: delete_column_click}
   - type: Button
-    properties: {role: null, align: left, tooltip: 'Example: Birth year should be
-        constant for the same person in the data (id as key)', border: '', enabled: true,
-      foreground: '', visible: true, text: Tie to a key, font_size: null, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:key'}
+    properties: {role: null, align: left, tooltip: 'Example: Birth year should be constant for the same person in the data (id as key)', border: '', enabled: true, foreground: '', visible: true, text: Tie to a key, font_size: null, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:key'}
     name: tie_data_btn
     layout_properties: {grid_position: 'NXEMLB,PJZIQY'}
     event_bindings: {click: tie_data_btn_click}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: false, text: Search for data, font_size: 12, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:search'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: false, text: Search for data, font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:search'}
     name: search_data
     layout_properties:
       col_widths: {}
       grid_position: CUKRGF,LNGRHT
     event_bindings: {click: search_data_click}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: false, text: Search PATTERNS, font_size: 12, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:search'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: false, text: Search PATTERNS, font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:search'}
     name: button_4
     layout_properties: {grid_position: 'HFHYYK,JLEGOZ'}
   - type: Button
-    properties: {role: null, align: left, tooltip: '', border: '', enabled: true,
-      foreground: '', visible: false, text: ' Get link to data', font_size: 12, font: '',
-      spacing_above: small, icon_align: left, spacing_below: small, italic: false,
-      background: '', bold: false, underline: false, icon: 'fa:link'}
+    properties: {role: null, align: left, tooltip: '', border: '', enabled: true, foreground: '', visible: false, text: ' Get link to data', font_size: 12, font: '', spacing_above: small, icon_align: left, spacing_below: small, italic: false, background: '', bold: false, underline: false, icon: 'fa:link'}
     name: get_link_to_share
     layout_properties: {grid_position: 'ANPVTW,ALOCMS'}
     event_bindings: {click: get_link_to_share_click}

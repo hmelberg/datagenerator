@@ -209,7 +209,8 @@ def format_output_markdown(text, headline):
 
 def columns2data(columns):
   cols=columns.keys()
-  n=len(columns[cols[0]])
+  #n=len(columns[cols[0]])
+  n=int(self.nrows.text)
   #print(n)
   data = [{col:columns[col][i] for col in cols} for i in range(n)] 
   return data

@@ -100,7 +100,8 @@ class Front(FrontTemplate):
     
     
   def generate_codes_click(self, **event_args):
-    n=len(self.columns['id'])
+    #n=len(self.columns['id'])
+    n=int(self.nrows.text)
     selected = self.how_general.selected_value
          
     if selected=='example':
