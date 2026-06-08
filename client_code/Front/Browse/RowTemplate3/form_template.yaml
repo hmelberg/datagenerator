@@ -1,4 +1,4 @@
-container: {type: DataRowPanel}
 components: []
+container: {type: DataRowPanel}
 is_package: true
 untouched: true

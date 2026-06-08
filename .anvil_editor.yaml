@@ -1,4 +1,7 @@
 unique_ids:
+  assets:
+    standard-page.html: QZTJZVJGHD5JF5RURYA652GT2FF462U6
+    theme.css: A7KCIDZULURXG7YLQU6YCRKTP7RZDLHR
   forms:
     Front: EJCZQWGXVD4DTCMYGQUILHFMJFLLHQTJ
     Front.Browse: C6WDXNIBMJ7NUUQUM5YDARUF7FI66YNE
@@ -9,9 +12,6 @@ unique_ids:
     Front_copy: JJQO5DRBQ6M3QYFAQRYNGZ23PGQSYWZE
   modules:
     Function: 4MVACNS7464JNMI5624UNRGKENO7DBFO
+  scripts: {}
   server_modules:
     ServerModule1: IYR4N3CWJYQE36BPRDICGVT73Q7VXRUL
-  assets:
-    standard-page.html: QZTJZVJGHD5JF5RURYA652GT2FF462U6
-    theme.css: A7KCIDZULURXG7YLQU6YCRKTP7RZDLHR
-  scripts: {}

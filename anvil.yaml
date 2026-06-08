@@ -1,171 +1,175 @@
-dependencies: []
-services:
-- source: /runtime/services/tables.yml
-  client_config: {}
-  server_config: {}
-- source: /runtime/services/anvil/users.yml
-  client_config: {allow_signup: true, enable_automatically: true, use_email: true, confirm_email: true}
-  server_config: {user_table: users}
-- source: /runtime/services/stripe.yml
-  client_config: {live_mode: true}
-  server_config: {}
-package_name: DataGenerator
 allow_embedding: false
-name: DataGenerator2
-runtime_options: {version: 2, client_version: '3', server_version: python3-full, server_spec: null}
-metadata: {}
-startup_form: Front
 db_schema:
-  patterns:
-    title: patterns
-    client: full
-    server: full
-    columns:
-    - name: name
-      admin_ui: {width: 157}
-      type: string
-    - name: pattern
-      admin_ui: {width: 279.6}
-      type: string
-    - name: long_name
-      admin_ui: {width: 142}
-      type: string
-    - name: description
-      admin_ui: {width: 200}
-      type: string
-    - name: code_system
-      admin_ui: {width: 142}
-      type: string
-    - name: country
-      admin_ui: {width: 140}
-      type: string
-    - name: year
-      admin_ui: {width: 50}
-      type: number
-    - name: version
-      admin_ui: {width: 200}
-      type: string
-    - name: regex
-      admin_ui: {width: 200}
-      type: bool
-    - name: link
-      admin_ui: {width: 200}
-      type: string
-    - name: date_created
-      admin_ui: {width: 200}
-      type: date
-    - name: created_by
-      admin_ui: {width: 200}
-      type: link_single
-      target: null
-    - name: examples
-      admin_ui: {width: 200}
-      type: string
-    - name: include_at_startup
-      admin_ui: {width: 200}
-      type: bool
-    - name: exclude
-      admin_ui: {width: 200}
-      type: bool
-    - name: only_valid_possible
-      admin_ui: {width: 200}
-      type: bool
-    - name: all_valid_possible
-      admin_ui: {width: 200}
-      type: bool
-    - name: headline
-      admin_ui: {width: 200}
-      type: string
-    - name: autoid
-      admin_ui: {width: 200}
-      type: number
-    - name: tags
-      admin_ui: {width: 200}
-      type: simpleObject
-    - name: order
-      admin_ui: {width: 200}
-      type: number
-    - name: codelist
-      admin_ui: {width: 200}
-      type: simpleObject
-  users:
-    title: Users
-    client: none
-    server: full
-    columns:
-    - name: email
-      admin_ui: {width: 200}
-      type: string
-    - name: enabled
-      admin_ui: {width: 100}
-      type: bool
-    - name: registration_date
-      admin_ui: {width: 200}
-      type: date
-  info:
-    title: info
-    client: none
-    server: full
-    columns:
-    - name: pattern_autoid_max
-      admin_ui: {width: 200}
-      type: number
   csv:
-    title: csv
     client: search
-    server: full
     columns:
-    - name: name
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: name
       type: string
-    - name: created_by
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: created_by
       type: string
-    - name: date
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: date
       type: datetime
-    - name: description
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: description
       type: string
-    - name: link
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: link
       type: string
-    - name: tags
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: tags
       type: string
-    - name: data_binary
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: data_binary
       type: media
-    - name: data_object
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: data_object
       type: simpleObject
-    - name: private
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: private
       type: bool
-    - name: recipe
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: recipe
       type: simpleObject
-  recipes:
-    title: recipes
-    client: none
     server: full
+    title: csv
+  info:
+    client: none
     columns:
-    - name: name
-      admin_ui: {width: 200}
-      type: string
-    - name: column
-      admin_ui: {width: 200}
-      type: string
-    - name: base
-      admin_ui: {width: 200}
-      type: string
-    - name: specifically
-      admin_ui: {width: 200}
-      type: string
-    - name: key
-      admin_ui: {width: 200}
-      type: string
-    - name: seed
-      admin_ui: {width: 200}
+    - admin_ui: {width: 200}
+      name: pattern_autoid_max
       type: number
+    server: full
+    title: info
+  patterns:
+    client: full
+    columns:
+    - admin_ui: {width: 157}
+      name: name
+      type: string
+    - admin_ui: {width: 279.6}
+      name: pattern
+      type: string
+    - admin_ui: {width: 142}
+      name: long_name
+      type: string
+    - admin_ui: {width: 200}
+      name: description
+      type: string
+    - admin_ui: {width: 142}
+      name: code_system
+      type: string
+    - admin_ui: {width: 140}
+      name: country
+      type: string
+    - admin_ui: {width: 50}
+      name: year
+      type: number
+    - admin_ui: {width: 200}
+      name: version
+      type: string
+    - admin_ui: {width: 200}
+      name: regex
+      type: bool
+    - admin_ui: {width: 200}
+      name: link
+      type: string
+    - admin_ui: {width: 200}
+      name: date_created
+      type: date
+    - admin_ui: {width: 200}
+      name: created_by
+      target: null
+      type: link_single
+    - admin_ui: {width: 200}
+      name: examples
+      type: string
+    - admin_ui: {width: 200}
+      name: include_at_startup
+      type: bool
+    - admin_ui: {width: 200}
+      name: exclude
+      type: bool
+    - admin_ui: {width: 200}
+      name: only_valid_possible
+      type: bool
+    - admin_ui: {width: 200}
+      name: all_valid_possible
+      type: bool
+    - admin_ui: {width: 200}
+      name: headline
+      type: string
+    - admin_ui: {width: 200}
+      name: autoid
+      type: number
+    - admin_ui: {width: 200}
+      name: tags
+      type: simpleObject
+    - admin_ui: {width: 200}
+      name: order
+      type: number
+    - admin_ui: {width: 200}
+      name: codelist
+      type: simpleObject
+    server: full
+    title: patterns
+  recipes:
+    client: none
+    columns:
+    - admin_ui: {width: 200}
+      name: name
+      type: string
+    - admin_ui: {width: 200}
+      name: column
+      type: string
+    - admin_ui: {width: 200}
+      name: base
+      type: string
+    - admin_ui: {width: 200}
+      name: specifically
+      type: string
+    - admin_ui: {width: 200}
+      name: key
+      type: string
+    - admin_ui: {width: 200}
+      name: seed
+      type: number
+    server: full
+    title: recipes
+  users:
+    client: none
+    columns:
+    - admin_ui: {width: 200}
+      name: email
+      type: string
+    - admin_ui: {width: 100}
+      name: enabled
+      type: bool
+    - admin_ui: {width: 200}
+      name: registration_date
+      type: date
+    server: full
+    title: Users
+dependencies: []
+metadata: {}
+name: DataGenerator2
+package_name: DataGenerator
 renamed: true
+runtime_options:
+  client_version: '3'
+  server_spec: {}
+  server_version: python3-full
+  version: 2
+services:
+- client_config: {}
+  server_config: {}
+  source: /runtime/services/tables.yml
+- client_config: {allow_signup: true, confirm_email: true, enable_automatically: true, use_email: true}
+  server_config: {user_table: users}
+  source: /runtime/services/anvil/users.yml
+- client_config: {live_mode: true}
+  server_config: {}
+  source: /runtime/services/stripe.yml
+startup_form: Front
