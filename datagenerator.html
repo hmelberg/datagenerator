@@ -1623,7 +1623,13 @@ window.DG = (function () {
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/randexp@0.5.3/build/randexp.min.js"></script>
+<script type="module">
+/* randexp har ingen browser-build på CDN — lastes som ES-modul.
+   Modul-scripts kjører før DOMContentLoaded, så window.RandExp er satt
+   når UI-laget kobler DG.regexLib. */
+import RandExp from 'https://cdn.jsdelivr.net/npm/randexp@0.5.3/+esm';
+window.RandExp = RandExp;
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </body>
 </html>
