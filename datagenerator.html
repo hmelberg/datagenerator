@@ -6,11 +6,98 @@
 <title>Datagenerator — syntetiske registerdata</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/css/tabulator.min.css">
 <style>
-/* fylles i Task 9 */
+:root {
+  --accent: #1a6e63; --accent-light: #e3f2ef; --border: #d8dee4;
+  --bg: #f6f8f9; --card: #ffffff; --text: #1f2d3a; --muted: #667788; --error: #b3261e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+header.topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.7rem 1.2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+header.topbar h1 { font-size: 1.15rem; margin: 0 auto 0 0; color: var(--accent); }
+header.topbar label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+header.topbar input { width: 6rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; }
+.lang-switch button { border: 1px solid var(--border); background: var(--card); padding: 0.25rem 0.6rem; cursor: pointer; }
+.lang-switch button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lang-switch button:first-child { border-radius: 6px 0 0 6px; }
+.lang-switch button:last-child { border-radius: 0 6px 6px 0; }
+nav.tabs { display: flex; gap: 0.4rem; padding: 0.8rem 1.2rem 0; }
+nav.tabs button { border: 1px solid var(--border); border-bottom: none; background: #eceff2; padding: 0.5rem 1.1rem; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.95rem; }
+nav.tabs button.active { background: var(--card); font-weight: 600; color: var(--accent); }
+main { padding: 1rem 1.2rem 3rem; }
+.tabpanel[hidden] { display: none; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.8rem; }
+.card h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.8rem; }
+button.primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 0.55rem 1.3rem; font-size: 1rem; cursor: pointer; }
+button.primary:hover { filter: brightness(1.1); }
+button.ghost { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.9rem; cursor: pointer; }
+.error-text { color: var(--error); font-size: 0.85rem; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+.sample { font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--accent); overflow-wrap: anywhere; }
+.dataset-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin: 0.8rem 0 0.5rem; }
+.dataset-tabs button { border: 1px solid var(--border); background: #eceff2; border-radius: 6px; padding: 0.3rem 0.8rem; cursor: pointer; font-size: 0.85rem; }
+.dataset-tabs button.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+.field-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.4rem; }
+.field-row label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--muted); gap: 0.15rem; }
+.field-row input, .field-row select, .field-row textarea { padding: 0.3rem 0.45rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+#selftest-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 99; padding: 0.6rem 1rem; color: #fff; font-weight: 600; }
+#selftest-banner.ok { background: #1a7f37; }
+#selftest-banner.fail { background: var(--error); }
+.tabulator { border-radius: 8px; border: 1px solid var(--border); }
 </style>
 </head>
 <body>
-<div id="app"><!-- fylles i Task 9 --></div>
+<div id="app">
+  <header class="topbar">
+    <h1 data-i18n="appTitle">Datagenerator</h1>
+    <label><span data-i18n="nPersons">Antall personer</span>
+      <input id="inp-n" type="number" value="500" min="1" max="100000"></label>
+    <label><span data-i18n="seed">Seed</span>
+      <input id="inp-seed" type="text" value="42"></label>
+    <span class="lang-switch">
+      <button id="lang-no" class="active">NO</button><button id="lang-en">EN</button>
+    </span>
+  </header>
+  <nav class="tabs">
+    <button id="tab-btn-presets" class="active" data-i18n="tabPresets">Ferdige datasett</button>
+    <button id="tab-btn-builder" data-i18n="tabBuilder">Bygg selv</button>
+  </nav>
+  <main>
+    <section id="tab-presets" class="tabpanel">
+      <p class="muted" data-i18n="presetsIntro">Velg registre, sett antall personer og seed, og trykk Generer. Alle filene kan kobles på lopenr.</p>
+      <div id="preset-cards" class="cards-grid"></div>
+      <div class="toolbar">
+        <button id="btn-generate-presets" class="primary" data-i18n="generate">Generer</button>
+        <button id="btn-zip-all" class="ghost" data-i18n="downloadAll" disabled>Last ned alle (zip)</button>
+      </div>
+      <div id="dataset-tabs" class="dataset-tabs"></div>
+      <div id="dataset-toolbar" class="toolbar"></div>
+      <div id="dataset-table"></div>
+    </section>
+    <section id="tab-builder" class="tabpanel" hidden>
+      <p class="muted" data-i18n="builderIntro">Bygg et datasett kolonne for kolonne. Eksempler oppdateres mens du skriver.</p>
+      <div id="builder-cols"></div>
+      <div class="toolbar">
+        <button id="btn-add-col" class="ghost" data-i18n="addColumn">+ Legg til kolonne</button>
+        <button id="btn-generate-builder" class="primary" data-i18n="generate">Generer</button>
+        <button id="btn-save-spec" class="ghost" data-i18n="saveSpec">Lagre oppskrift (JSON)</button>
+        <label class="ghost" style="padding:0.4rem 0.9rem; cursor:pointer; border:1px solid var(--border); border-radius:8px;">
+          <span data-i18n="loadSpec">Last oppskrift</span>
+          <input id="inp-load-spec" type="file" accept=".json" style="display:none">
+        </label>
+      </div>
+      <div id="builder-errors"></div>
+      <div class="toolbar" id="builder-export" hidden>
+        <button id="btn-dl-builder-csv" class="ghost">CSV</button>
+        <button id="btn-dl-builder-json" class="ghost">JSON</button>
+        <button id="btn-copy-builder" class="ghost" data-i18n="copy">Kopier</button>
+        <span id="builder-rowinfo" class="muted"></span>
+      </div>
+      <div id="builder-table"></div>
+    </section>
+  </main>
+</div>
 
 <script data-node-testable>
 /* ===== MOTOR (rene funksjoner, ingen DOM) ===== */
@@ -1073,6 +1160,105 @@ window.DG = (function () {
 
 <script>
 /* ===== UI — fylles i Task 9-11. Kjører IKKE i node. ===== */
+(function () {
+  'use strict';
+  document.addEventListener('DOMContentLoaded', function () {
+    const DG = window.DG;
+    DG.regexLib = window.RandExp || null;
+
+    // --- i18n ---
+    const T = {
+      no: {
+        appTitle: 'Datagenerator', nPersons: 'Antall personer', seed: 'Seed',
+        tabPresets: 'Ferdige datasett', tabBuilder: 'Bygg selv',
+        presetsIntro: 'Velg registre, sett antall personer og seed, og trykk Generer. Alle filene kan kobles på lopenr.',
+        builderIntro: 'Bygg et datasett kolonne for kolonne. Eksempler oppdateres mens du skriver.',
+        generate: 'Generer', downloadAll: 'Last ned alle (zip)', downloadCsv: 'Last ned CSV',
+        copy: 'Kopier', copied: 'Kopiert!', addColumn: '+ Legg til kolonne',
+        saveSpec: 'Lagre oppskrift (JSON)', loadSpec: 'Last oppskrift',
+        customize: 'Tilpass', population: 'Populasjon', delete: 'Slett',
+        colName: 'Navn', colType: 'Type', tieTo: 'Stabil per', missing: '% missing',
+        showingRows: (a, b) => `viser ${a} av ${b} rader`, rows: 'rader',
+        typeNames: { recipe: 'Oppskrift', example: 'Eksempel', regex: 'Regex', list: 'Liste', number: 'Tall', date: 'Dato', sequence: 'Sekvens', constant: 'Konstant' }
+      },
+      en: {
+        appTitle: 'Data generator', nPersons: 'Number of persons', seed: 'Seed',
+        tabPresets: 'Ready-made datasets', tabBuilder: 'Build your own',
+        presetsIntro: 'Select registries, set population size and seed, then press Generate. All files link on lopenr.',
+        builderIntro: 'Build a dataset column by column. Samples update as you type.',
+        generate: 'Generate', downloadAll: 'Download all (zip)', downloadCsv: 'Download CSV',
+        copy: 'Copy', copied: 'Copied!', addColumn: '+ Add column',
+        saveSpec: 'Save recipe (JSON)', loadSpec: 'Load recipe',
+        customize: 'Customize', population: 'Population', delete: 'Delete',
+        colName: 'Name', colType: 'Type', tieTo: 'Stable per', missing: '% missing',
+        showingRows: (a, b) => `showing ${a} of ${b} rows`, rows: 'rows',
+        typeNames: { recipe: 'Recipe', example: 'Example', regex: 'Regex', list: 'List', number: 'Number', date: 'Date', sequence: 'Sequence', constant: 'Constant' }
+      }
+    };
+    const state = { lang: 'no', datasets: null, activeDataset: null, builderCols: [], builderResult: null };
+    const t = (key) => T[state.lang][key] ?? key;
+
+    function setLang(lang) {
+      state.lang = lang;
+      document.getElementById('lang-no').classList.toggle('active', lang === 'no');
+      document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+      document.querySelectorAll('[data-i18n]').forEach(node => {
+        const v = t(node.dataset.i18n);
+        if (typeof v === 'string') node.textContent = v;
+      });
+      rerenderDynamic();
+    }
+    // Task 10/11 registrerer re-render-funksjoner her:
+    const dynamicRenderers = [];
+    function rerenderDynamic() { dynamicRenderers.forEach(fn => fn()); }
+
+    // --- hjelpere ---
+    const el = (tag, className, text) => {
+      const n = document.createElement(tag);
+      if (className) n.className = className;
+      if (text != null) n.textContent = text;
+      return n;
+    };
+    const getN = () => Math.max(1, parseInt(document.getElementById('inp-n').value, 10) || 500);
+    const getSeed = () => document.getElementById('inp-seed').value || '42';
+
+    function downloadBlob(filename, blob) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+    const csvBlob = (ds) => new Blob(['﻿' + DG.toCsv(ds.order, ds.rows)], { type: 'text/csv;charset=utf-8' });
+    const downloadCsv = (basename, ds) => downloadBlob(basename + '.csv', csvBlob(ds));
+
+    // --- faner ---
+    function showTab(id) {
+      document.getElementById('tab-presets').hidden = id !== 'presets';
+      document.getElementById('tab-builder').hidden = id !== 'builder';
+      document.getElementById('tab-btn-presets').classList.toggle('active', id === 'presets');
+      document.getElementById('tab-btn-builder').classList.toggle('active', id === 'builder');
+    }
+    document.getElementById('tab-btn-presets').addEventListener('click', () => showTab('presets'));
+    document.getElementById('tab-btn-builder').addEventListener('click', () => showTab('builder'));
+    document.getElementById('lang-no').addEventListener('click', () => setLang('no'));
+    document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
+
+    // --- selftest-banner (?selftest) ---
+    if (location.search.includes('selftest')) {
+      const res = DG.runTests();
+      const banner = el('div', null,
+        res.failed ? `${res.failed} av ${res.total} tester FEILET — se konsollen` : `Selvtest OK: ${res.total} tester besto`);
+      banner.id = 'selftest-banner';
+      banner.className = res.failed ? 'fail' : 'ok';
+      document.body.prepend(banner);
+      res.failures.forEach(f => console.error('SELFTEST FEIL: ' + f.name + ' — ' + f.message));
+    }
+
+    // Task 10/11 henger seg på dette delte skopet:
+    window._ui = { T, t, state, setLang, el, getN, getSeed, downloadBlob, downloadCsv, csvBlob, showTab, dynamicRenderers };
+  });
+})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/randexp@0.5.3/build/randexp.min.js"></script>
