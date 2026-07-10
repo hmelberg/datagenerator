@@ -161,11 +161,13 @@ window.DG = (function () {
     if (!pattern || !String(pattern).trim()) throw new Error('tomt mønster');
     const segs = [];
     const re = /\[([^\]]*)\]|([^\[\]]+)/g;
-    let m;
+    let m, consumed = 0;
     while ((m = re.exec(String(pattern))) !== null) {
       if (m[2] !== undefined) segs.push({ literal: m[2] });
       else segs.push(DG._parseGroup(m[1]));
+      consumed += m[0].length;
     }
+    if (consumed !== String(pattern).length) throw new Error('ubalansert klamme i mønsteret: ' + pattern);
     return segs;
   };
 
@@ -326,6 +328,13 @@ window.DG = (function () {
     for (let i = 0; i < 30; i++) {
       const v = DG.recipeValue(segs, rng);
       DG.assert(/^[AB][xyz][1-3]\.\d$/.test(v), 'fikk ' + v);
+    }
+  });
+  DG.test('recipe: ubalansert klamme kaster feil', () => {
+    for (const bad of ['[abc', 'abc]', '[a][b']) {
+      let threw = false;
+      try { DG.parseRecipe(bad); } catch (e) { threw = true; }
+      DG.assert(threw, 'skulle kastet for: ' + bad);
     }
   });
   DG.test('recipe: generator gir n verdier', () => {
