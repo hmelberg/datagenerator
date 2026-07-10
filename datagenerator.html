@@ -205,6 +205,54 @@ window.DG = (function () {
     return Array.from({ length: n }, () => String(rx.gen()));
   };
 
+  // --- kolonnepipeline ---
+  DG.generateColumn = function (spec, n, rng, columns) {
+    const gen = DG.generators[spec.type];
+    if (!gen) throw new Error('ukjent kolonnetype: ' + spec.type);
+    let values;
+    if (spec.tieTo) {
+      const key = columns[spec.tieTo];
+      if (!key) throw new Error('nøkkelkolonnen finnes ikke: ' + spec.tieTo);
+      const uniq = [...new Set(key)];
+      const uniqVals = gen(uniq.length, spec.params || {}, rng);
+      const map = new Map(uniq.map((k, i) => [k, uniqVals[i]]));
+      values = key.map(k => map.get(k));
+    } else {
+      values = gen(n, spec.params || {}, rng);
+    }
+    if (spec.missing > 0) values = values.map(v => (rng.random() < spec.missing ? '' : v));
+    return values;
+  };
+
+  DG.buildDataset = function (specs, n, seed) {
+    const rng = DG.makeRng(seed);
+    const columns = {}, order = [], errors = [];
+    for (const spec of specs) {
+      try {
+        columns[spec.name] = DG.generateColumn(spec, n, rng, columns);
+        order.push(spec.name);
+      } catch (e) {
+        errors.push({ column: spec.name, message: e.message });
+      }
+    }
+    const rows = Array.from({ length: n }, (_, i) => {
+      const r = {};
+      for (const name of order) r[name] = columns[name][i];
+      return r;
+    });
+    return { columns, order, rows, errors };
+  };
+
+  DG.toCsv = function (order, rows, sep = ';') {
+    const esc = (v) => {
+      v = String(v ?? '');
+      return (v.includes(sep) || v.includes('"') || v.includes('\n')) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    };
+    const lines = [order.map(esc).join(sep)];
+    for (const r of rows) lines.push(order.map(c => esc(r[c])).join(sep));
+    return lines.join('\n');
+  };
+
   return DG;
 })();
 </script>
@@ -358,6 +406,52 @@ window.DG = (function () {
     try { DG.generators.regex(1, { pattern: 'A' }, DG.makeRng(1)); } catch (e) { threw = true; }
     DG.regexLib = saved;
     DG.assert(threw);
+  });
+
+  DG.test('generateColumn: tieTo gir stabil verdi per nøkkel', () => {
+    const rng = DG.makeRng(11);
+    const columns = { id: ['1', '2', '1', '3', '2', '1'] };
+    const vals = DG.generateColumn(
+      { name: 'f', type: 'number', params: { min: 1900, max: 2010 }, tieTo: 'id' }, 6, rng, columns);
+    DG.assertEq(vals[0], vals[2]); DG.assertEq(vals[0], vals[5]); DG.assertEq(vals[1], vals[4]);
+  });
+  DG.test('generateColumn: tieTo mot ukjent kolonne kaster feil', () => {
+    let threw = false;
+    try { DG.generateColumn({ name: 'x', type: 'constant', params: { value: 'a' }, tieTo: 'finnesikke' }, 3, DG.makeRng(1), {}); }
+    catch (e) { threw = true; }
+    DG.assert(threw);
+  });
+  DG.test('generateColumn: missing gir omtrent riktig andel tomme', () => {
+    const vals = DG.generateColumn({ name: 'x', type: 'constant', params: { value: 'v' }, missing: 0.3 }, 1000, DG.makeRng(13), {});
+    const empty = vals.filter(v => v === '').length;
+    DG.assert(empty > 200 && empty < 400, 'fikk ' + empty + ' tomme av 1000');
+  });
+  DG.test('buildDataset: bygger rader i kolonnerekkefølge', () => {
+    const ds = DG.buildDataset([
+      { name: 'id', type: 'sequence', params: {} },
+      { name: 'gruppe', type: 'list', params: { values: ['a'] } }
+    ], 3, 42);
+    DG.assertEq(ds.order, ['id', 'gruppe']);
+    DG.assertEq(ds.rows, [{ id: '1', gruppe: 'a' }, { id: '2', gruppe: 'a' }, { id: '3', gruppe: 'a' }]);
+    DG.assertEq(ds.errors, []);
+  });
+  DG.test('buildDataset: feil i én kolonne stopper ikke de andre', () => {
+    const ds = DG.buildDataset([
+      { name: 'ok', type: 'sequence', params: {} },
+      { name: 'krasj', type: 'recipe', params: { pattern: '[a,b;p=(2,3)]' } },
+      { name: 'ok2', type: 'constant', params: { value: 'x' } }
+    ], 2, 1);
+    DG.assertEq(ds.order, ['ok', 'ok2']);
+    DG.assertEq(ds.errors.length, 1);
+    DG.assertEq(ds.errors[0].column, 'krasj');
+  });
+  DG.test('buildDataset: samme seed gir identisk resultat', () => {
+    const specs = [{ name: 'n', type: 'number', params: { min: 0, max: 1000 } }];
+    DG.assertEq(DG.buildDataset(specs, 20, 'frø'), DG.buildDataset(specs, 20, 'frø'));
+  });
+  DG.test('toCsv: semikolon, quoting og linjeskift', () => {
+    const csv = DG.toCsv(['a', 'b'], [{ a: '1', b: 'x;y' }, { a: '2', b: 'med "fnutt"' }]);
+    DG.assertEq(csv, 'a;b\n1;"x;y"\n2;"med ""fnutt"""');
   });
 })(window.DG);
 </script>
