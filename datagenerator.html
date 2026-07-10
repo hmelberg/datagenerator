@@ -475,6 +475,83 @@ window.DG = (function () {
       { kode: '5', tekst: 'Separert' }
     ]
   };
+
+  DG.PRESETS = [];
+
+  // --- NPR (somatiske sykehusopphold) ---
+  DG.PRESETS.push({
+    id: 'npr', nameNo: 'NPR (sykehusopphold)', nameEn: 'NPR (hospital episodes)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'innDato', 'utDato', 'hoveddiagnose', 'bidiagnose1', 'omsorgsnivaa', 'institusjonID'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (0.15 + age / 60);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          const inn = DG.eventDate(rng, p);
+          let ut = new Date(inn.getTime() + rng.poisson(2) * 86400000);
+          if (p.dodsdato && DG.dateToStr(ut) > p.dodsdato) ut = new Date(Date.parse(p.dodsdato));
+          rows.push({
+            lopenr: p.lopenr,
+            innDato: DG.dateToStr(inn),
+            utDato: DG.dateToStr(ut),
+            hoveddiagnose: DG.pickCoded(DG.CODELISTS.icd10, rng, p).kode,
+            bidiagnose1: rng.random() < 0.4 ? DG.pickCoded(DG.CODELISTS.icd10, rng, p).kode : '',
+            omsorgsnivaa: rng.weightedChoice(['1', '2', '3'], [0.5, 0.15, 0.35]),
+            institusjonID: rng.choice(DG.CODELISTS.institusjoner).kode
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'innDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'utDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'hoveddiagnose', type: 'list', params: { values: DG.CODELISTS.icd10.map(c => c.kode), weights: DG.CODELISTS.icd10.map(c => c.w) } },
+        { name: 'bidiagnose1', type: 'list', params: { values: DG.CODELISTS.icd10.map(c => c.kode) }, missing: 0.6 },
+        { name: 'omsorgsnivaa', type: 'list', params: { values: ['1', '2', '3'], weights: [0.5, 0.15, 0.35] } },
+        { name: 'institusjonID', type: 'list', params: { values: DG.CODELISTS.institusjoner.map(c => c.kode) } }
+      ];
+    }
+  });
+
+  // --- Legemiddelregisteret (utleveringer) ---
+  DG.PRESETS.push({
+    id: 'lmr', nameNo: 'Legemiddelregisteret (utleveringer)', nameEn: 'Prescription register (dispensings)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'utleveringsDato', 'atcKode', 'ddd', 'antallPakninger'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (0.5 + age / 25);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          rows.push({
+            lopenr: p.lopenr,
+            utleveringsDato: DG.dateToStr(DG.eventDate(rng, p)),
+            atcKode: DG.pickCoded(DG.CODELISTS.atc, rng, p).kode,
+            ddd: String(rng.randint(10, 100)),
+            antallPakninger: String(rng.weightedChoice([1, 2, 3], [0.7, 0.2, 0.1]))
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'utleveringsDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'atcKode', type: 'list', params: { values: DG.CODELISTS.atc.map(c => c.kode), weights: DG.CODELISTS.atc.map(c => c.w) } },
+        { name: 'ddd', type: 'number', params: { min: 10, max: 100 } },
+        { name: 'antallPakninger', type: 'list', params: { values: ['1', '2', '3'], weights: [0.7, 0.2, 0.1] } }
+      ];
+    }
+  });
 })(window.DG);
 </script>
 
@@ -735,6 +812,65 @@ window.DG = (function () {
     for (let i = 0; i < 200; i++) {
       const d = DG.dateToStr(DG.eventDate(rng, p));
       DG.assert(d >= '2020-01-01' && d <= '2022-06-15', 'fikk ' + d);
+    }
+  });
+
+  DG.test('PRESETS: npr og lmr finnes med riktig form', () => {
+    for (const id of ['npr', 'lmr']) {
+      const p = DG.PRESETS.find(x => x.id === id);
+      DG.assert(p, id + ' mangler');
+      DG.assert(typeof p.make === 'function' && typeof p.builderSpec === 'function');
+      DG.assert(Array.isArray(p.builderSpec()), 'builderSpec skal gi array');
+    }
+  });
+  DG.test('npr: koblbar, gyldige koder, ingen hendelser etter død', () => {
+    const rng = DG.makeRng(31);
+    const pop = DG.makePopulation(300, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'innDato', 'utDato', 'hoveddiagnose', 'bidiagnose1', 'omsorgsnivaa', 'institusjonID']);
+    DG.assert(ds.rows.length > 50, 'for få NPR-rader: ' + ds.rows.length);
+    for (const r of ds.rows) {
+      const person = byId[r.lopenr];
+      DG.assert(person, 'ukjent lopenr ' + r.lopenr);
+      DG.assert(r.innDato <= r.utDato, 'utDato før innDato');
+      if (person.dodsdato) DG.assert(r.innDato <= person.dodsdato, 'innleggelse etter død');
+      DG.assert(DG.CODELISTS.icd10.some(c => c.kode === r.hoveddiagnose), 'ukjent diagnose ' + r.hoveddiagnose);
+    }
+  });
+  DG.test('npr: svangerskaps-/fødselskoder bare hos kvinner', () => {
+    const rng = DG.makeRng(32);
+    const pop = DG.makePopulation(400, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 2 });
+    for (const r of ds.rows) {
+      if (r.hoveddiagnose === 'O80' || r.hoveddiagnose === 'C50.9') DG.assertEq(byId[r.lopenr].kjonn, '2', r.hoveddiagnose + ' hos mann');
+      if (r.hoveddiagnose === 'C61') DG.assertEq(byId[r.lopenr].kjonn, '1', 'C61 hos kvinne');
+    }
+  });
+  DG.test('npr: eldre har flere innleggelser enn unge (samvariasjon)', () => {
+    const rng = DG.makeRng(33);
+    const pop = DG.makePopulation(600, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 1 });
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    let young = 0, old = 0, nYoung = 0, nOld = 0;
+    for (const p of pop) { if (DG.ageOf(p) < 30) nYoung++; else if (DG.ageOf(p) >= 65) nOld++; }
+    for (const r of ds.rows) { const a = DG.ageOf(byId[r.lopenr]); if (a < 30) young++; else if (a >= 65) old++; }
+    DG.assert(old / Math.max(nOld, 1) > young / Math.max(nYoung, 1), 'eldre skal ha høyere rate');
+  });
+  DG.test('lmr: koblbar, gyldige ATC-koder, riktige kolonner', () => {
+    const rng = DG.makeRng(34);
+    const pop = DG.makePopulation(300, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'lmr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'utleveringsDato', 'atcKode', 'ddd', 'antallPakninger']);
+    DG.assert(ds.rows.length > 100, 'for få LMR-rader');
+    for (const r of ds.rows) {
+      DG.assert(byId[r.lopenr], 'ukjent lopenr');
+      DG.assert(DG.CODELISTS.atc.some(c => c.kode === r.atcKode), 'ukjent ATC ' + r.atcKode);
+      DG.assert(Number(r.ddd) > 0 && Number(r.antallPakninger) >= 1);
+      const person = byId[r.lopenr];
+      if (person.dodsdato) DG.assert(r.utleveringsDato <= person.dodsdato, 'utlevering etter død');
     }
   });
 })(window.DG);
