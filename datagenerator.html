@@ -253,6 +253,59 @@ window.DG = (function () {
     return lines.join('\n');
   };
 
+  // --- populasjon og samvariasjon ---
+  DG.STUDY_FROM = '2015-01-01';
+  DG.STUDY_TO = '2024-12-31';
+  DG.REF_YEAR = 2024;
+  DG.POP_ORDER = ['lopenr', 'kjonn', 'fodselsaar', 'bostedskommune', 'dodsdato'];
+  // grov norsk alderspyramide (vekter i prosent)
+  DG.AGE_BUCKETS = [
+    { min: 0, max: 9, w: 11 }, { min: 10, max: 19, w: 12 }, { min: 20, max: 29, w: 13 },
+    { min: 30, max: 39, w: 14 }, { min: 40, max: 49, w: 13 }, { min: 50, max: 59, w: 13 },
+    { min: 60, max: 69, w: 11 }, { min: 70, max: 79, w: 8 }, { min: 80, max: 89, w: 4 },
+    { min: 90, max: 100, w: 1 }
+  ];
+
+  DG.ageOf = (person) => DG.REF_YEAR - parseInt(person.fodselsaar, 10);
+
+  DG.makePopulation = function (n, rng) {
+    const rows = [];
+    const bucketW = DG.AGE_BUCKETS.map(b => b.w);
+    for (let i = 1; i <= n; i++) {
+      const b = rng.weightedChoice(DG.AGE_BUCKETS, bucketW);
+      const age = rng.randint(b.min, b.max);
+      const kjonn = rng.random() < 0.5 ? '1' : '2';
+      const kommune = rng.choice(DG.CODELISTS.kommuner).kode;
+      const pDead = age < 50 ? 0.002 : age < 70 ? 0.02 : age < 80 ? 0.08 : 0.25;
+      const dodsdato = rng.random() < pDead
+        ? DG.dateToStr(DG.randomDate(rng, DG.STUDY_FROM, DG.STUDY_TO)) : '';
+      rows.push({
+        lopenr: String(i), kjonn, fodselsaar: String(DG.REF_YEAR - age),
+        bostedskommune: kommune, dodsdato
+      });
+    }
+    return rows;
+  };
+
+  DG.pickCoded = function (list, rng, person) {
+    const age = DG.ageOf(person);
+    const ok = list.filter(c =>
+      (!c.sex || c.sex === person.kjonn) &&
+      (c.minAge === undefined || age >= c.minAge) &&
+      (c.maxAge === undefined || age <= c.maxAge));
+    if (!ok.length) return list[0];
+    return rng.weightedChoice(ok, ok.map(c => c.w ?? 1));
+  };
+
+  DG.eventDate = function (rng, person) {
+    let from = DG.STUDY_FROM;
+    const birthFrom = person.fodselsaar + '-01-01';
+    if (birthFrom > from) from = birthFrom;
+    let to = person.dodsdato || DG.STUDY_TO;
+    if (to < from) to = from;
+    return DG.randomDate(rng, from, to);
+  };
+
   return DG;
 })();
 </script>
@@ -634,6 +687,47 @@ window.DG = (function () {
   DG.test('CODELISTS: kjønnsbundne koder finnes (svangerskap kvinner, prostata menn)', () => {
     DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '2'), 'ingen kvinne-koder i icd10');
     DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '1'), 'ingen mann-koder i icd10');
+  });
+
+  DG.test('makePopulation: riktige felter og deterministisk', () => {
+    const a = DG.makePopulation(50, DG.makeRng(21));
+    const b = DG.makePopulation(50, DG.makeRng(21));
+    DG.assertEq(a, b);
+    DG.assertEq(a.length, 50);
+    DG.assertEq(Object.keys(a[0]), ['lopenr', 'kjonn', 'fodselsaar', 'bostedskommune', 'dodsdato']);
+    DG.assertEq(a[0].lopenr, '1'); DG.assertEq(a[49].lopenr, '50');
+  });
+  DG.test('makePopulation: rimelige verdier', () => {
+    const pop = DG.makePopulation(300, DG.makeRng(22));
+    for (const p of pop) {
+      DG.assert(p.kjonn === '1' || p.kjonn === '2');
+      const y = Number(p.fodselsaar);
+      DG.assert(y >= DG.REF_YEAR - 100 && y <= DG.REF_YEAR, 'fodselsaar ' + p.fodselsaar);
+      DG.assert(DG.CODELISTS.kommuner.some(k => k.kode === p.bostedskommune));
+      if (p.dodsdato) DG.assert(p.dodsdato >= DG.STUDY_FROM && p.dodsdato <= DG.STUDY_TO);
+    }
+    const dead = pop.filter(p => p.dodsdato).length;
+    DG.assert(dead < 100, 'for mange døde: ' + dead);
+    const women = pop.filter(p => p.kjonn === '2').length;
+    DG.assert(women > 100 && women < 200, 'skjev kjønnsfordeling: ' + women);
+  });
+  DG.test('pickCoded: respekterer kjønn og alder', () => {
+    const rng = DG.makeRng(23);
+    const mann40 = { kjonn: '1', fodselsaar: String(DG.REF_YEAR - 40) };
+    for (let i = 0; i < 200; i++) {
+      const c = DG.pickCoded(DG.CODELISTS.icd10, rng, mann40);
+      DG.assert(c.sex !== '2', 'mann fikk kvinne-kode ' + c.kode);
+      if (c.minAge !== undefined) DG.assert(c.minAge <= 40, 'for ung for ' + c.kode);
+      if (c.maxAge !== undefined) DG.assert(c.maxAge >= 40, 'for gammel for ' + c.kode);
+    }
+  });
+  DG.test('eventDate: aldri etter dodsdato, aldri før fødselsår', () => {
+    const rng = DG.makeRng(24);
+    const p = { kjonn: '2', fodselsaar: '2020', dodsdato: '2022-06-15' };
+    for (let i = 0; i < 200; i++) {
+      const d = DG.dateToStr(DG.eventDate(rng, p));
+      DG.assert(d >= '2020-01-01' && d <= '2022-06-15', 'fikk ' + d);
+    }
   });
 })(window.DG);
 </script>
