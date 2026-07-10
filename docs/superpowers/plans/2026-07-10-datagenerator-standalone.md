@@ -1,0 +1,2166 @@
+# Datagenerator standalone HTML — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Én selvstendig `datagenerator.html` som genererer koblbare syntetiske norske registerdata (NPR, Legemiddelregisteret, KUHR, SSB, FD-trygd) og har en «bygg selv»-kolonnebygger.
+
+**Architecture:** Alt i én HTML-fil med tre script-lag: (1) ren generatormotor på `window.DG` (node-testbar), (2) datalag med kodelister og preset-definisjoner (node-testbart), (3) UI. Node-testrigg `tests/run_tests.mjs` ekstraherer `<script data-node-testable>`-blokkene fra HTML-filen og kjører DG sin innebygde testregistrering — samme tester kjører i nettleser via `?selftest`.
+
+**Tech Stack:** Vanilla JS (ES2020), Tabulator 6.3 (CDN), randexp 0.5 (CDN), JSZip 3.10 (CDN), Node ≥18 kun for tester.
+
+**Spec:** `docs/superpowers/specs/2026-07-10-datagenerator-standalone-design.md` — les den først.
+
+## Global Constraints
+
+- Alt produkt-kode i ÉN fil: `datagenerator.html` (repo-rot). Tester i `tests/run_tests.mjs`.
+- Kun disse CDN-avhengighetene: Tabulator 6.3, randexp 0.5.3, JSZip 3.10.1. Ingen andre.
+- Motorlaget (`window.DG`) skal ALDRI røre DOM eller `document`/`location` — det kjører i node.
+- Samme seed + samme innstillinger → byte-identisk CSV.
+- CSV: semikolon-separator, UTF-8 med BOM, `\n` linjeskift.
+- UI-tekst: norsk standard, engelsk via språkbryter. Alle labels gjennom `t(key)`/`data-i18n`.
+- Feil vises inline (rød tekst) — aldri `alert()`.
+- `node tests/run_tests.mjs` skal være grønn ved hvert commit.
+- Kjønnskoding overalt: `'1'` = mann, `'2'` = kvinne (SSB-konvensjon).
+- Datoformat overalt: `YYYY-MM-DD`.
+
+---
+
+### Task 1: Skjelett, node-testrigg og seeded RNG
+
+**Files:**
+- Create: `datagenerator.html`
+- Create: `tests/run_tests.mjs`
+
+**Interfaces:**
+- Produces: `window.DG` med `DG.test(name, fn)`, `DG.assert(cond, msg)`, `DG.assertEq(a, b, msg)`, `DG.runTests() -> {total, failed, failures:[{name,message}]}`, `DG.mulberry32(seed:number) -> ()=>number`, `DG.hashSeed(str:string) -> number`, `DG.makeRng(seed:number|string) -> rng`, der `rng = {random():number, randint(min,max):number (inklusiv), uniform(min,max):number, normal(mean,sd):number, choice(arr):any, weightedChoice(arr, weights):any, poisson(lambda):number}`, `DG.dateToStr(d:Date) -> 'YYYY-MM-DD'`, `DG.randomDate(rng, fromStr, toStr) -> Date`.
+- Konvensjon: testblokker ligger i egne `<script data-node-testable>`-blokker nederst i `<body>`; motor og datalag ligger i egne `data-node-testable`-blokker i toppen av `<body>`.
+
+- [ ] **Step 1: Opprett HTML-skjelett med tomme script-blokker**
+
+Skriv `datagenerator.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datagenerator — syntetiske registerdata</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/css/tabulator.min.css">
+<style>
+/* fylles i Task 9 */
+</style>
+</head>
+<body>
+<div id="app"><!-- fylles i Task 9 --></div>
+
+<script data-node-testable>
+/* ===== MOTOR (rene funksjoner, ingen DOM) ===== */
+window.DG = (function () {
+  'use strict';
+  const DG = {};
+
+  // --- testregister ---
+  DG.tests = [];
+  DG.test = (name, fn) => DG.tests.push({ name, fn });
+  DG.assert = (cond, msg) => { if (!cond) throw new Error(msg || 'assertion feilet'); };
+  DG.assertEq = (a, b, msg) => {
+    const ja = JSON.stringify(a), jb = JSON.stringify(b);
+    if (ja !== jb) throw new Error((msg ? msg + ': ' : '') + 'forventet ' + jb + ', fikk ' + ja);
+  };
+  DG.runTests = function () {
+    const failures = [];
+    for (const t of DG.tests) {
+      try { t.fn(); } catch (e) { failures.push({ name: t.name, message: e.message }); }
+    }
+    return { total: DG.tests.length, failed: failures.length, failures };
+  };
+
+  return DG;
+})();
+</script>
+
+<script data-node-testable>
+/* ===== DATALAG (kodelister og presets) — fylles i Task 5, 7, 8 ===== */
+</script>
+
+<script data-node-testable>
+/* ===== TESTER ===== */
+</script>
+
+<script>
+/* ===== UI — fylles i Task 9-11. Kjører IKKE i node. ===== */
+</script>
+<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/randexp@0.5.3/build/randexp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</body>
+</html>
+```
+
+- [ ] **Step 2: Skriv node-testriggen**
+
+Skriv `tests/run_tests.mjs`:
+
+```js
+import { readFileSync } from 'node:fs';
+
+const html = readFileSync(new URL('../datagenerator.html', import.meta.url), 'utf8');
+const blocks = [...html.matchAll(/<script data-node-testable>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+if (!blocks.length) { console.error('FEIL: fant ingen <script data-node-testable>-blokker'); process.exit(1); }
+
+const window = {};
+new Function('window', blocks.join('\n'))(window);
+const DG = window.DG;
+
+// Ekte RandExp lastes bare i nettleser; node bruker en stub som bare
+// verifiserer at regex-generatoren er koblet riktig.
+DG.regexLib = class { constructor(re) { this.re = re; } gen() { return 'X1'; } };
+
+const res = DG.runTests();
+for (const f of res.failures) console.error('FEIL: ' + f.name + ' — ' + f.message);
+console.log(res.failed ? `${res.failed} av ${res.total} tester FEILET` : `OK: ${res.total} tester besto`);
+process.exit(res.failed ? 1 : 0);
+```
+
+- [ ] **Step 3: Skriv feilende tester for RNG**
+
+I TESTER-blokken i `datagenerator.html`:
+
+```js
+(function (DG) {
+  'use strict';
+
+  DG.test('makeRng: samme seed gir identisk sekvens', () => {
+    const a = DG.makeRng(42), b = DG.makeRng(42);
+    DG.assertEq([a.random(), a.random(), a.random()], [b.random(), b.random(), b.random()]);
+  });
+  DG.test('makeRng: ulik seed gir ulik sekvens', () => {
+    DG.assert(DG.makeRng(1).random() !== DG.makeRng(2).random());
+  });
+  DG.test('makeRng: streng-seed fungerer', () => {
+    DG.assertEq(DG.makeRng('abc').random(), DG.makeRng('abc').random());
+  });
+  DG.test('randint: innenfor grensene, inklusiv', () => {
+    const rng = DG.makeRng(7);
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) { const v = rng.randint(1, 3); DG.assert(v >= 1 && v <= 3); seen.add(v); }
+    DG.assertEq([...seen].sort().join(''), '123', 'alle verdier 1-3 skal forekomme');
+  });
+  DG.test('weightedChoice: vekt 0 velges aldri', () => {
+    const rng = DG.makeRng(7);
+    for (let i = 0; i < 100; i++) DG.assertEq(rng.weightedChoice(['a', 'b'], [1, 0]), 'a');
+  });
+  DG.test('poisson: ikke-negativ og deterministisk', () => {
+    const a = DG.makeRng(5), b = DG.makeRng(5);
+    for (let i = 0; i < 50; i++) {
+      const va = a.poisson(2), vb = b.poisson(2);
+      DG.assert(va >= 0); DG.assertEq(va, vb);
+    }
+  });
+  DG.test('randomDate: innenfor intervallet', () => {
+    const rng = DG.makeRng(9);
+    for (let i = 0; i < 100; i++) {
+      const s = DG.dateToStr(DG.randomDate(rng, '2020-01-01', '2020-12-31'));
+      DG.assert(s >= '2020-01-01' && s <= '2020-12-31', 'fikk ' + s);
+    }
+  });
+})(window.DG);
+```
+
+- [ ] **Step 4: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — meldinger om at `DG.makeRng` ikke er en funksjon; exit code 1.
+
+- [ ] **Step 5: Implementer RNG og dato-hjelpere i MOTOR-blokken**
+
+Legg inn i MOTOR-blokken, etter testregisteret, før `return DG;`:
+
+```js
+  // --- seeded RNG (mulberry32) ---
+  DG.mulberry32 = function (seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+
+  DG.hashSeed = function (str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return h >>> 0;
+  };
+
+  DG.makeRng = function (seed) {
+    const random = DG.mulberry32(typeof seed === 'number' ? seed : DG.hashSeed(String(seed)));
+    return {
+      random,
+      randint: (min, max) => min + Math.floor(random() * (max - min + 1)),
+      uniform: (min, max) => min + random() * (max - min),
+      normal: (mean, sd) => {
+        const u = 1 - random(), v = random();
+        return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      },
+      choice: (arr) => arr[Math.floor(random() * arr.length)],
+      weightedChoice: (arr, weights) => {
+        let total = 0;
+        for (const w of weights) total += w;
+        let r = random() * total;
+        for (let i = 0; i < arr.length; i++) { r -= weights[i]; if (r < 0) return arr[i]; }
+        return arr[arr.length - 1];
+      },
+      poisson: (lambda) => {
+        const L = Math.exp(-lambda);
+        let k = 0, p = 1;
+        do { k++; p *= random(); } while (p > L);
+        return k - 1;
+      }
+    };
+  };
+
+  // --- dato-hjelpere (UTC hele veien → deterministisk) ---
+  DG.dateToStr = (d) => d.toISOString().slice(0, 10);
+  DG.randomDate = function (rng, fromStr, toStr) {
+    const a = Date.parse(fromStr), b = Date.parse(toStr);
+    return new Date(a + rng.random() * (b - a));
+  };
+```
+
+- [ ] **Step 6: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 7 tester besto`, exit code 0.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add datagenerator.html tests/run_tests.mjs
+git commit -m "feat: HTML-skjelett, node-testrigg og seeded RNG (mulberry32)"
+```
+
+---
+
+### Task 2: Basisgeneratorer (sequence, constant, number, date, list)
+
+**Files:**
+- Modify: `datagenerator.html` (MOTOR- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `DG.makeRng`, `DG.dateToStr`, `DG.randomDate` (Task 1).
+- Produces: `DG.generators` — objekt der hver generator har signaturen `(n:number, params:object, rng) -> string[]` (alltid strenger, alltid lengde n):
+  - `sequence`: params `{start?=1, step?=1}`
+  - `constant`: params `{value}`
+  - `number`: params `{dist?='uniform'|'normal', min?, max?, mean?, sd?, decimals?=0}` — normal klippes til min/maks hvis oppgitt
+  - `date`: params `{from:'YYYY-MM-DD', to:'YYYY-MM-DD'}`
+  - `list`: params `{values:string[], weights?:number[]}` — kaster `Error` hvis values mangler/tom
+
+- [ ] **Step 1: Skriv feilende tester**
+
+Legg til i TESTER-blokken (inne i samme IIFE, før slutt-parentesen):
+
+```js
+  DG.test('sequence: 1,2,3 som strenger', () => {
+    DG.assertEq(DG.generators.sequence(3, {}, DG.makeRng(1)), ['1', '2', '3']);
+  });
+  DG.test('sequence: start og step', () => {
+    DG.assertEq(DG.generators.sequence(3, { start: 10, step: 5 }, DG.makeRng(1)), ['10', '15', '20']);
+  });
+  DG.test('constant', () => {
+    DG.assertEq(DG.generators.constant(2, { value: 'x' }, DG.makeRng(1)), ['x', 'x']);
+  });
+  DG.test('number uniform: heltall innenfor grenser', () => {
+    const vals = DG.generators.number(100, { min: 10, max: 20 }, DG.makeRng(3));
+    for (const v of vals) { const x = Number(v); DG.assert(x >= 10 && x <= 20 && Number.isInteger(x), 'fikk ' + v); }
+  });
+  DG.test('number normal: klippes til min/max', () => {
+    const vals = DG.generators.number(200, { dist: 'normal', mean: 0, sd: 100, min: -10, max: 10 }, DG.makeRng(3));
+    for (const v of vals) { const x = Number(v); DG.assert(x >= -10 && x <= 10, 'fikk ' + v); }
+  });
+  DG.test('number: decimals gir fast antall desimaler', () => {
+    const vals = DG.generators.number(5, { min: 0, max: 1, decimals: 2 }, DG.makeRng(3));
+    for (const v of vals) DG.assert(/^\d+\.\d\d$/.test(v), 'fikk ' + v);
+  });
+  DG.test('date: innenfor intervall og riktig format', () => {
+    const vals = DG.generators.date(50, { from: '2019-06-01', to: '2019-06-30' }, DG.makeRng(4));
+    for (const v of vals) DG.assert(/^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '2019-06-01' && v <= '2019-06-30', 'fikk ' + v);
+  });
+  DG.test('list: trekker bare fra values', () => {
+    const vals = DG.generators.list(50, { values: ['a', 'b'] }, DG.makeRng(5));
+    for (const v of vals) DG.assert(v === 'a' || v === 'b');
+  });
+  DG.test('list: vekter respekteres (vekt 0 velges aldri)', () => {
+    const vals = DG.generators.list(50, { values: ['a', 'b'], weights: [1, 0] }, DG.makeRng(5));
+    for (const v of vals) DG.assertEq(v, 'a');
+  });
+  DG.test('list: tom liste kaster feil', () => {
+    let threw = false;
+    try { DG.generators.list(3, { values: [] }, DG.makeRng(1)); } catch (e) { threw = true; }
+    DG.assert(threw, 'skulle kastet Error');
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.generators` er undefined.
+
+- [ ] **Step 3: Implementer generatorene i MOTOR-blokken**
+
+```js
+  // --- kolonnegeneratorer: (n, params, rng) -> string[] ---
+  DG.generators = {
+    sequence: (n, p) => {
+      const start = p.start ?? 1, step = p.step ?? 1;
+      return Array.from({ length: n }, (_, i) => String(start + i * step));
+    },
+    constant: (n, p) => Array.from({ length: n }, () => String(p.value ?? '')),
+    number: (n, p, rng) => Array.from({ length: n }, () => {
+      let v = (p.dist === 'normal')
+        ? rng.normal(p.mean ?? 50, p.sd ?? 10)
+        : rng.uniform(p.min ?? 0, p.max ?? 100);
+      if (p.min !== undefined && v < p.min) v = p.min;
+      if (p.max !== undefined && v > p.max) v = p.max;
+      return v.toFixed(p.decimals ?? 0);
+    }),
+    date: (n, p, rng) => {
+      if (!p.from || !p.to) throw new Error('dato krever from og to');
+      return Array.from({ length: n }, () => DG.dateToStr(DG.randomDate(rng, p.from, p.to)));
+    },
+    list: (n, p, rng) => {
+      if (!p.values || !p.values.length) throw new Error('liste uten verdier');
+      const w = (p.weights && p.weights.length === p.values.length) ? p.weights : null;
+      return Array.from({ length: n }, () => String(w ? rng.weightedChoice(p.values, w) : rng.choice(p.values)));
+    }
+  };
+```
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 17 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: basisgeneratorer (sequence, constant, number, date, list)"
+```
+
+---
+
+### Task 3: Oppskriftsspråk, eksempel-mønster og regex
+
+**Files:**
+- Modify: `datagenerator.html` (MOTOR- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `DG.generators`, `DG.makeRng`.
+- Produces:
+  - `DG.parseRecipe(pattern:string) -> segs[]` — hvert segment er `{literal:string}` eller `{options:string[], weights:number[]|null}`. Kaster `Error` med norsk melding ved ugyldig syntaks.
+  - `DG.recipeValue(segs, rng) -> string`
+  - `DG.exampleValue(pattern:string, rng) -> string`
+  - `DG.generators.recipe` (params `{pattern}`), `DG.generators.example` (params `{pattern}`), `DG.generators.regex` (params `{pattern}`)
+  - `DG.regexLib` — settes utenfra (RandExp i nettleser, stub i node). `generators.regex` kaster hvis den ikke er satt.
+- Oppskriftssyntaks (bakoverkompatibel med Anvil-appen, se `client_code/Function/__init__.py` `random_code_from_recipe`):
+  - `[a-f]` tegn-range, INKLUSIV begge ender (bugfiks: Anvil-appen var eksklusiv i noen grener)
+  - `[10-31]` heltalls-range når en side har flere sifre
+  - `[x,y,z]` opsjonsliste; `[a-f,1-3]` blandet (ranges ekspanderes)
+  - `;p=(0.5)` én verdi = total sannsynlighet fordelt likt på opsjonene, resten → tom streng
+  - `;p=(0.1,0.9)` én vekt per opsjon (før ekspansjon); sum < 1 → resten tom streng; sum > 1 → Error
+  - Tekst UTENFOR klammer er literal (forbedring; Anvil-appen ignorerte den)
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('recipe: range er inklusiv', () => {
+    const segs = DG.parseRecipe('[a-c]');
+    DG.assertEq(segs[0].options, ['a', 'b', 'c']);
+  });
+  DG.test('recipe: heltalls-range med flere sifre', () => {
+    DG.assertEq(DG.parseRecipe('[9-11]')[0].options, ['9', '10', '11']);
+  });
+  DG.test('recipe: opsjonsliste og literal utenfor klammer', () => {
+    const rng = DG.makeRng(1);
+    const segs = DG.parseRecipe('[A,B]-[1,1]');
+    const v = DG.recipeValue(segs, rng);
+    DG.assert(/^[AB]-1$/.test(v), 'fikk ' + v);
+  });
+  DG.test('recipe: blandet range og opsjon', () => {
+    DG.assertEq(DG.parseRecipe('[a-b,x]')[0].options, ['a', 'b', 'x']);
+  });
+  DG.test('recipe: enkel p spres og gir tom-opsjon', () => {
+    const seg = DG.parseRecipe('[a,b;p=(0.5)]')[0];
+    DG.assertEq(seg.options, ['a', 'b', '']);
+    DG.assertEq(seg.weights.map(w => Math.round(w * 100) / 100), [0.25, 0.25, 0.5]);
+  });
+  DG.test('recipe: p per opsjon, sum 1 gir ingen tom-opsjon', () => {
+    const seg = DG.parseRecipe('[a,b;p=(0.1,0.9)]')[0];
+    DG.assertEq(seg.options, ['a', 'b']);
+  });
+  DG.test('recipe: p-sum over 1 kaster feil', () => {
+    let threw = false;
+    try { DG.parseRecipe('[a,b;p=(0.8,0.9)]'); } catch (e) { threw = true; }
+    DG.assert(threw);
+  });
+  DG.test('recipe: anvil-eksempelet fungerer', () => {
+    const segs = DG.parseRecipe('[A,B][x,y,z;p=(0.8,0.1,0.1)][1-3][.][0-9]');
+    const rng = DG.makeRng(2);
+    for (let i = 0; i < 30; i++) {
+      const v = DG.recipeValue(segs, rng);
+      DG.assert(/^[AB][xyz][1-3]\.\d$/.test(v), 'fikk ' + v);
+    }
+  });
+  DG.test('recipe: generator gir n verdier', () => {
+    DG.assertEq(DG.generators.recipe(4, { pattern: '[1-2]' }, DG.makeRng(1)).length, 4);
+  });
+  DG.test('example: K50.1 gir samme form', () => {
+    const rng = DG.makeRng(3);
+    for (let i = 0; i < 20; i++) {
+      const v = DG.exampleValue('K50.1', rng);
+      DG.assert(/^[A-Z]\d\d\.\d$/.test(v), 'fikk ' + v);
+    }
+  });
+  DG.test('regex: koblet mot DG.regexLib', () => {
+    const vals = DG.generators.regex(3, { pattern: 'A\\d' }, DG.makeRng(1));
+    DG.assertEq(vals.length, 3);
+    for (const v of vals) DG.assert(typeof v === 'string' && v.length > 0);
+  });
+  DG.test('regex: kaster hvis lib mangler', () => {
+    const saved = DG.regexLib; DG.regexLib = null;
+    let threw = false;
+    try { DG.generators.regex(1, { pattern: 'A' }, DG.makeRng(1)); } catch (e) { threw = true; }
+    DG.regexLib = saved;
+    DG.assert(threw);
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.parseRecipe` er undefined.
+
+- [ ] **Step 3: Implementer i MOTOR-blokken**
+
+```js
+  // --- oppskriftsspråket ---
+  DG._parseGroup = function (inner) {
+    let expr = inner, probPart = null;
+    const pIdx = inner.indexOf(';p=');
+    if (pIdx >= 0) { expr = inner.slice(0, pIdx); probPart = inner.slice(pIdx + 3); }
+    const rawOptions = expr.split(',').map(s => s.trim());
+    if (!rawOptions.length || rawOptions.every(s => s === '')) throw new Error('tom gruppe: [' + inner + ']');
+    const perRaw = []; let options = [];
+    for (const opt of rawOptions) {
+      const m = opt.match(/^(\w+)-(\w+)$/);
+      let expanded;
+      if (m && /^\d+$/.test(m[1]) && /^\d+$/.test(m[2]) && (m[1].length > 1 || m[2].length > 1)) {
+        expanded = [];
+        for (let v = parseInt(m[1], 10); v <= parseInt(m[2], 10); v++) expanded.push(String(v));
+      } else if (m && m[1].length === 1 && m[2].length === 1) {
+        expanded = [];
+        for (let c = m[1].charCodeAt(0); c <= m[2].charCodeAt(0); c++) expanded.push(String.fromCharCode(c));
+      } else {
+        expanded = [opt];
+      }
+      if (!expanded.length) throw new Error('ugyldig intervall: ' + opt + ' i [' + inner + ']');
+      perRaw.push(expanded); options = options.concat(expanded);
+    }
+    let weights = null;
+    if (probPart !== null) {
+      const pm = probPart.match(/^\(([^)]*)\)$/);
+      if (!pm) throw new Error('ugyldig p= i [' + inner + '] — forventet p=(...)');
+      const ps = pm[1].split(',').map(s => parseFloat(s.trim()));
+      if (ps.some(isNaN)) throw new Error('ugyldig sannsynlighet i [' + inner + ']');
+      if (ps.length === 1) {
+        weights = options.map(() => ps[0] / options.length);
+      } else {
+        if (ps.length !== perRaw.length) throw new Error('antall sannsynligheter (' + ps.length + ') matcher ikke antall valg (' + perRaw.length + ') i [' + inner + ']');
+        weights = [];
+        perRaw.forEach((group, i) => group.forEach(() => weights.push(ps[i] / group.length)));
+      }
+      const sum = weights.reduce((a, b) => a + b, 0);
+      if (sum > 1.000001) throw new Error('sannsynlighetene summerer til mer enn 1 i [' + inner + ']');
+      if (sum < 0.999999) { options = options.concat(['']); weights = weights.concat([1 - sum]); }
+    }
+    return { options, weights };
+  };
+
+  DG.parseRecipe = function (pattern) {
+    if (!pattern || !String(pattern).trim()) throw new Error('tomt mønster');
+    const segs = [];
+    const re = /\[([^\]]*)\]|([^\[\]]+)/g;
+    let m;
+    while ((m = re.exec(String(pattern))) !== null) {
+      if (m[2] !== undefined) segs.push({ literal: m[2] });
+      else segs.push(DG._parseGroup(m[1]));
+    }
+    return segs;
+  };
+
+  DG.recipeValue = (segs, rng) => segs.map(s =>
+    s.literal !== undefined ? s.literal
+      : (s.weights ? rng.weightedChoice(s.options, s.weights) : rng.choice(s.options))
+  ).join('');
+
+  // --- eksempel-mønster: etterlign formen på ett eksempel ---
+  DG.exampleValue = function (pattern, rng) {
+    let out = '';
+    for (const ch of String(pattern)) {
+      if (/[0-9]/.test(ch)) out += String(rng.randint(0, 9));
+      else if (/[A-Z]/.test(ch)) out += String.fromCharCode(65 + rng.randint(0, 25));
+      else if (/[a-z]/.test(ch)) out += String.fromCharCode(97 + rng.randint(0, 25));
+      else out += ch;
+    }
+    return out;
+  };
+
+  DG.regexLib = null; // settes av UI (RandExp) eller testrigg (stub)
+
+  DG.generators.recipe = (n, p, rng) => {
+    const segs = DG.parseRecipe(p.pattern);
+    return Array.from({ length: n }, () => DG.recipeValue(segs, rng));
+  };
+  DG.generators.example = (n, p, rng) => {
+    if (!p.pattern) throw new Error('eksempel-mønster mangler');
+    return Array.from({ length: n }, () => DG.exampleValue(p.pattern, rng));
+  };
+  DG.generators.regex = (n, p, rng) => {
+    if (!DG.regexLib) throw new Error('regex-biblioteket (randexp) er ikke lastet');
+    const rx = new DG.regexLib(new RegExp(p.pattern));
+    rx.randInt = (a, b) => rng.randint(a, b); // seeded i stedet for Math.random
+    return Array.from({ length: n }, () => String(rx.gen()));
+  };
+```
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 29 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: oppskriftsspråk (anvil-kompatibelt), eksempel-mønster og regex-generator"
+```
+
+---
+
+### Task 4: Kolonnepipeline (tie-to-key, missing, buildDataset, toCsv)
+
+**Files:**
+- Modify: `datagenerator.html` (MOTOR- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `DG.generators`, `DG.makeRng`.
+- Produces:
+  - Kolonnespec-objekt (brukes av UI og presets): `{name:string, type:string, params:object, tieTo?:string, missing?:number}` — `missing` er andel 0–1.
+  - `DG.generateColumn(spec, n, rng, columns) -> string[]` — `columns` er `{navn: string[]}` for allerede genererte kolonner (trengs av `tieTo`).
+  - `DG.buildDataset(specs:spec[], n:number, seed) -> {columns:{navn:string[]}, order:string[], rows:object[], errors:[{column,message}]}` — én kolonne som feiler stopper ikke de andre.
+  - `DG.toCsv(order:string[], rows:object[], sep=';') -> string` — RFC-4180-aktig quoting, `\n` linjeskift, UTEN BOM (BOM legges på av nedlastingsfunksjonen i UI).
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('generateColumn: tieTo gir stabil verdi per nøkkel', () => {
+    const rng = DG.makeRng(11);
+    const columns = { id: ['1', '2', '1', '3', '2', '1'] };
+    const vals = DG.generateColumn(
+      { name: 'f', type: 'number', params: { min: 1900, max: 2010 }, tieTo: 'id' }, 6, rng, columns);
+    DG.assertEq(vals[0], vals[2]); DG.assertEq(vals[0], vals[5]); DG.assertEq(vals[1], vals[4]);
+  });
+  DG.test('generateColumn: tieTo mot ukjent kolonne kaster feil', () => {
+    let threw = false;
+    try { DG.generateColumn({ name: 'x', type: 'constant', params: { value: 'a' }, tieTo: 'finnesikke' }, 3, DG.makeRng(1), {}); }
+    catch (e) { threw = true; }
+    DG.assert(threw);
+  });
+  DG.test('generateColumn: missing gir omtrent riktig andel tomme', () => {
+    const vals = DG.generateColumn({ name: 'x', type: 'constant', params: { value: 'v' }, missing: 0.3 }, 1000, DG.makeRng(13), {});
+    const empty = vals.filter(v => v === '').length;
+    DG.assert(empty > 200 && empty < 400, 'fikk ' + empty + ' tomme av 1000');
+  });
+  DG.test('buildDataset: bygger rader i kolonnerekkefølge', () => {
+    const ds = DG.buildDataset([
+      { name: 'id', type: 'sequence', params: {} },
+      { name: 'gruppe', type: 'list', params: { values: ['a'] } }
+    ], 3, 42);
+    DG.assertEq(ds.order, ['id', 'gruppe']);
+    DG.assertEq(ds.rows, [{ id: '1', gruppe: 'a' }, { id: '2', gruppe: 'a' }, { id: '3', gruppe: 'a' }]);
+    DG.assertEq(ds.errors, []);
+  });
+  DG.test('buildDataset: feil i én kolonne stopper ikke de andre', () => {
+    const ds = DG.buildDataset([
+      { name: 'ok', type: 'sequence', params: {} },
+      { name: 'krasj', type: 'recipe', params: { pattern: '[a,b;p=(2,3)]' } },
+      { name: 'ok2', type: 'constant', params: { value: 'x' } }
+    ], 2, 1);
+    DG.assertEq(ds.order, ['ok', 'ok2']);
+    DG.assertEq(ds.errors.length, 1);
+    DG.assertEq(ds.errors[0].column, 'krasj');
+  });
+  DG.test('buildDataset: samme seed gir identisk resultat', () => {
+    const specs = [{ name: 'n', type: 'number', params: { min: 0, max: 1000 } }];
+    DG.assertEq(DG.buildDataset(specs, 20, 'frø'), DG.buildDataset(specs, 20, 'frø'));
+  });
+  DG.test('toCsv: semikolon, quoting og linjeskift', () => {
+    const csv = DG.toCsv(['a', 'b'], [{ a: '1', b: 'x;y' }, { a: '2', b: 'med "fnutt"' }]);
+    DG.assertEq(csv, 'a;b\n1;"x;y"\n2;"med ""fnutt"""');
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.generateColumn` er undefined.
+
+- [ ] **Step 3: Implementer i MOTOR-blokken**
+
+```js
+  // --- kolonnepipeline ---
+  DG.generateColumn = function (spec, n, rng, columns) {
+    const gen = DG.generators[spec.type];
+    if (!gen) throw new Error('ukjent kolonnetype: ' + spec.type);
+    let values;
+    if (spec.tieTo) {
+      const key = columns[spec.tieTo];
+      if (!key) throw new Error('nøkkelkolonnen finnes ikke: ' + spec.tieTo);
+      const uniq = [...new Set(key)];
+      const uniqVals = gen(uniq.length, spec.params || {}, rng);
+      const map = new Map(uniq.map((k, i) => [k, uniqVals[i]]));
+      values = key.map(k => map.get(k));
+    } else {
+      values = gen(n, spec.params || {}, rng);
+    }
+    if (spec.missing > 0) values = values.map(v => (rng.random() < spec.missing ? '' : v));
+    return values;
+  };
+
+  DG.buildDataset = function (specs, n, seed) {
+    const rng = DG.makeRng(seed);
+    const columns = {}, order = [], errors = [];
+    for (const spec of specs) {
+      try {
+        columns[spec.name] = DG.generateColumn(spec, n, rng, columns);
+        order.push(spec.name);
+      } catch (e) {
+        errors.push({ column: spec.name, message: e.message });
+      }
+    }
+    const rows = Array.from({ length: n }, (_, i) => {
+      const r = {};
+      for (const name of order) r[name] = columns[name][i];
+      return r;
+    });
+    return { columns, order, rows, errors };
+  };
+
+  DG.toCsv = function (order, rows, sep = ';') {
+    const esc = (v) => {
+      v = String(v ?? '');
+      return (v.includes(sep) || v.includes('"') || v.includes('\n')) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    };
+    const lines = [order.map(esc).join(sep)];
+    for (const r of rows) lines.push(order.map(c => esc(r[c])).join(sep));
+    return lines.join('\n');
+  };
+```
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 36 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: kolonnepipeline med tie-to-key, missing-andel, buildDataset og toCsv"
+```
+
+---
+
+### Task 5: Kodelister (datalag)
+
+**Files:**
+- Modify: `datagenerator.html` (DATALAG- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `window.DG` (eksisterer).
+- Produces: `DG.CODELISTS` med disse feltene (alle koder er EKTE koder fra kodeverkene):
+  - `icd10: [{kode, tekst, w, sex?, minAge?, maxAge?}]` — `sex` er `'1'`/`'2'`, aldergrenser i år
+  - `icpc2: [{kode, tekst, w, sex?, minAge?, maxAge?}]`
+  - `atc: [{kode, tekst, w, sex?, minAge?, maxAge?}]`
+  - `kommuner: [{kode, navn}]` — 2024-kommunenummer
+  - `institusjoner: [{kode, navn}]`
+  - `takster: [{kode, w}]`
+  - `ytelser: ['sykepenger','uforetrygd','dagpenger','AAP']`
+  - `nus: ['1','2','3','4','5','6','7','8']`
+  - `sivilstand: [{kode, tekst}]` — SSB-koder 1–5
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('CODELISTS: alle lister finnes og er ikke-tomme', () => {
+    for (const k of ['icd10', 'icpc2', 'atc', 'kommuner', 'institusjoner', 'takster', 'ytelser', 'nus', 'sivilstand']) {
+      DG.assert(Array.isArray(DG.CODELISTS[k]) && DG.CODELISTS[k].length > 0, k + ' mangler');
+    }
+    DG.assert(DG.CODELISTS.icd10.length >= 40, 'icd10 skal ha minst 40 koder');
+    DG.assert(DG.CODELISTS.atc.length >= 25, 'atc skal ha minst 25 koder');
+    DG.assert(DG.CODELISTS.icpc2.length >= 25, 'icpc2 skal ha minst 25 koder');
+  });
+  DG.test('CODELISTS: gyldige felter og formater', () => {
+    for (const c of DG.CODELISTS.icd10) {
+      DG.assert(/^[A-Z]\d\d(\.\d+)?$/.test(c.kode), 'ugyldig ICD-10-kode: ' + c.kode);
+      DG.assert(typeof c.w === 'number' && c.w > 0, 'vekt mangler for ' + c.kode);
+      if (c.sex) DG.assert(c.sex === '1' || c.sex === '2', 'ugyldig sex for ' + c.kode);
+    }
+    for (const c of DG.CODELISTS.atc) DG.assert(/^[A-Z]\d\d[A-Z]{2}\d\d$/.test(c.kode), 'ugyldig ATC-kode: ' + c.kode);
+    for (const c of DG.CODELISTS.icpc2) DG.assert(/^[A-Z]\d\d$/.test(c.kode), 'ugyldig ICPC-2-kode: ' + c.kode);
+    for (const c of DG.CODELISTS.kommuner) DG.assert(/^\d{4}$/.test(c.kode), 'ugyldig kommunenr: ' + c.kode);
+  });
+  DG.test('CODELISTS: kjønnsbundne koder finnes (svangerskap kvinner, prostata menn)', () => {
+    DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '2'), 'ingen kvinne-koder i icd10');
+    DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '1'), 'ingen mann-koder i icd10');
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.CODELISTS` er undefined.
+
+- [ ] **Step 3: Legg inn kodelistene i DATALAG-blokken**
+
+```js
+(function (DG) {
+  'use strict';
+  DG.CODELISTS = {
+    icd10: [
+      { kode: 'J06.9', tekst: 'Akutt øvre luftveisinfeksjon', w: 8 },
+      { kode: 'J18.9', tekst: 'Pneumoni', w: 5 },
+      { kode: 'J03.9', tekst: 'Akutt tonsillitt', w: 3, maxAge: 40 },
+      { kode: 'J45.9', tekst: 'Astma', w: 4 },
+      { kode: 'J44.9', tekst: 'KOLS', w: 3, minAge: 45 },
+      { kode: 'A09', tekst: 'Gastroenteritt', w: 3 },
+      { kode: 'I10', tekst: 'Essensiell hypertensjon', w: 7, minAge: 30 },
+      { kode: 'I21.9', tekst: 'Akutt hjerteinfarkt', w: 3, minAge: 40 },
+      { kode: 'I25.1', tekst: 'Aterosklerotisk hjertesykdom', w: 3, minAge: 45 },
+      { kode: 'I50.9', tekst: 'Hjertesvikt', w: 3, minAge: 50 },
+      { kode: 'I63.9', tekst: 'Hjerneinfarkt', w: 2, minAge: 45 },
+      { kode: 'I48.9', tekst: 'Atrieflimmer', w: 3, minAge: 50 },
+      { kode: 'E11.9', tekst: 'Diabetes type 2', w: 4, minAge: 30 },
+      { kode: 'E10.9', tekst: 'Diabetes type 1', w: 1 },
+      { kode: 'E66.9', tekst: 'Fedme', w: 2 },
+      { kode: 'C50.9', tekst: 'Brystkreft', w: 2, sex: '2', minAge: 30 },
+      { kode: 'C61', tekst: 'Prostatakreft', w: 2, sex: '1', minAge: 50 },
+      { kode: 'C34.9', tekst: 'Lungekreft', w: 1, minAge: 40 },
+      { kode: 'C18.9', tekst: 'Tykktarmskreft', w: 1, minAge: 40 },
+      { kode: 'K35.8', tekst: 'Akutt appendisitt', w: 2, maxAge: 50 },
+      { kode: 'K50.9', tekst: 'Crohns sykdom', w: 1 },
+      { kode: 'K51.9', tekst: 'Ulcerøs kolitt', w: 1 },
+      { kode: 'K80.2', tekst: 'Gallestein', w: 2, minAge: 25 },
+      { kode: 'K21.9', tekst: 'Gastroøsofageal refluks', w: 2 },
+      { kode: 'N39.0', tekst: 'Urinveisinfeksjon', w: 4 },
+      { kode: 'N20.0', tekst: 'Nyrestein', w: 2, minAge: 20 },
+      { kode: 'M54.5', tekst: 'Lumbago', w: 6, minAge: 18 },
+      { kode: 'M16.9', tekst: 'Hofteartrose', w: 3, minAge: 50 },
+      { kode: 'M17.9', tekst: 'Kneartrose', w: 3, minAge: 45 },
+      { kode: 'S52.5', tekst: 'Brudd i distale radius', w: 3 },
+      { kode: 'S72.0', tekst: 'Lårhalsbrudd', w: 2, minAge: 60 },
+      { kode: 'S06.0', tekst: 'Hjernerystelse', w: 2 },
+      { kode: 'F32.9', tekst: 'Depressiv episode', w: 4, minAge: 15 },
+      { kode: 'F41.9', tekst: 'Angstlidelse', w: 4, minAge: 15 },
+      { kode: 'F10.2', tekst: 'Alkoholavhengighet', w: 2, minAge: 18 },
+      { kode: 'F20.9', tekst: 'Schizofreni', w: 1, minAge: 18 },
+      { kode: 'G40.9', tekst: 'Epilepsi', w: 1 },
+      { kode: 'G35', tekst: 'Multippel sklerose', w: 1, minAge: 20, maxAge: 60 },
+      { kode: 'G20', tekst: 'Parkinsons sykdom', w: 1, minAge: 55 },
+      { kode: 'G30.9', tekst: 'Alzheimers sykdom', w: 2, minAge: 65 },
+      { kode: 'O80', tekst: 'Spontan fødsel', w: 3, sex: '2', minAge: 16, maxAge: 45 },
+      { kode: 'H25.9', tekst: 'Senil katarakt', w: 2, minAge: 60 },
+      { kode: 'H66.9', tekst: 'Mellomørebetennelse', w: 3, maxAge: 20 },
+      { kode: 'R07.4', tekst: 'Brystsmerter', w: 3 },
+      { kode: 'R10.4', tekst: 'Magesmerter', w: 4 },
+      { kode: 'R55', tekst: 'Synkope', w: 2 },
+      { kode: 'Z51.1', tekst: 'Kjemoterapi', w: 1, minAge: 30 }
+    ],
+    icpc2: [
+      { kode: 'R74', tekst: 'Øvre luftveisinfeksjon', w: 8 },
+      { kode: 'R05', tekst: 'Hoste', w: 5 },
+      { kode: 'R96', tekst: 'Astma', w: 3 },
+      { kode: 'R78', tekst: 'Akutt bronkitt', w: 3 },
+      { kode: 'R97', tekst: 'Allergisk rinitt', w: 3 },
+      { kode: 'L03', tekst: 'Korsryggsymptomer', w: 6, minAge: 15 },
+      { kode: 'L92', tekst: 'Skuldersyndrom', w: 3, minAge: 20 },
+      { kode: 'L84', tekst: 'Ryggsyndrom uten smerteutstråling', w: 2, minAge: 20 },
+      { kode: 'K86', tekst: 'Hypertensjon ukomplisert', w: 6, minAge: 30 },
+      { kode: 'K74', tekst: 'Angina pectoris', w: 2, minAge: 45 },
+      { kode: 'K77', tekst: 'Hjertesvikt', w: 2, minAge: 55 },
+      { kode: 'T90', tekst: 'Diabetes type 2', w: 4, minAge: 30 },
+      { kode: 'P76', tekst: 'Depressiv lidelse', w: 4, minAge: 15 },
+      { kode: 'P74', tekst: 'Angstlidelse', w: 4, minAge: 15 },
+      { kode: 'P06', tekst: 'Søvnforstyrrelse', w: 3, minAge: 15 },
+      { kode: 'A97', tekst: 'Ingen sykdom / helsekontroll', w: 3 },
+      { kode: 'A04', tekst: 'Slapphet/tretthet', w: 3 },
+      { kode: 'W78', tekst: 'Svangerskap', w: 3, sex: '2', minAge: 16, maxAge: 45 },
+      { kode: 'X11', tekst: 'Menopausesymptomer', w: 2, sex: '2', minAge: 45, maxAge: 60 },
+      { kode: 'U71', tekst: 'Cystitt', w: 3 },
+      { kode: 'S88', tekst: 'Kontakteksem', w: 2 },
+      { kode: 'H71', tekst: 'Akutt mellomørebetennelse', w: 3, maxAge: 20 },
+      { kode: 'D73', tekst: 'Gastroenteritt', w: 2 },
+      { kode: 'F70', tekst: 'Konjunktivitt', w: 2 },
+      { kode: 'N01', tekst: 'Hodepine', w: 3 },
+      { kode: 'N89', tekst: 'Migrene', w: 2, minAge: 15 },
+      { kode: 'B80', tekst: 'Jernmangelanemi', w: 1 },
+      { kode: 'D84', tekst: 'Spiserørssykdom', w: 1 },
+      { kode: 'T82', tekst: 'Fedme', w: 2 },
+      { kode: 'K90', tekst: 'Hjerneslag', w: 1, minAge: 50 }
+    ],
+    atc: [
+      { kode: 'N02BE01', tekst: 'Paracetamol', w: 8 },
+      { kode: 'M01AE01', tekst: 'Ibuprofen', w: 6 },
+      { kode: 'N02AA05', tekst: 'Oksykodon', w: 2, minAge: 18 },
+      { kode: 'C10AA05', tekst: 'Atorvastatin', w: 6, minAge: 40 },
+      { kode: 'C10AA01', tekst: 'Simvastatin', w: 3, minAge: 40 },
+      { kode: 'C09CA01', tekst: 'Losartan', w: 3, minAge: 35 },
+      { kode: 'C07AB02', tekst: 'Metoprolol', w: 4, minAge: 35 },
+      { kode: 'C08CA01', tekst: 'Amlodipin', w: 3, minAge: 35 },
+      { kode: 'C03CA01', tekst: 'Furosemid', w: 2, minAge: 50 },
+      { kode: 'B01AC06', tekst: 'Acetylsalisylsyre', w: 4, minAge: 45 },
+      { kode: 'B01AF01', tekst: 'Rivaroksaban', w: 2, minAge: 50 },
+      { kode: 'A02BC01', tekst: 'Omeprazol', w: 4 },
+      { kode: 'A02BC02', tekst: 'Pantoprazol', w: 3 },
+      { kode: 'A10BA02', tekst: 'Metformin', w: 4, minAge: 30 },
+      { kode: 'A10BJ06', tekst: 'Semaglutid', w: 2, minAge: 18 },
+      { kode: 'J01CA04', tekst: 'Amoksicillin', w: 4 },
+      { kode: 'J01CE02', tekst: 'Fenoksymetylpenicillin', w: 5 },
+      { kode: 'J01XE01', tekst: 'Nitrofurantoin', w: 2 },
+      { kode: 'R03AC02', tekst: 'Salbutamol', w: 4 },
+      { kode: 'R03AK06', tekst: 'Salmeterol og flutikason', w: 2 },
+      { kode: 'R06AE07', tekst: 'Cetirizin', w: 3 },
+      { kode: 'N05BA04', tekst: 'Oksazepam', w: 2, minAge: 18 },
+      { kode: 'N05CF01', tekst: 'Zopiklon', w: 3, minAge: 18 },
+      { kode: 'N06AB04', tekst: 'Citalopram', w: 3, minAge: 15 },
+      { kode: 'N06AB10', tekst: 'Escitalopram', w: 3, minAge: 15 },
+      { kode: 'N06AX16', tekst: 'Venlafaksin', w: 2, minAge: 18 },
+      { kode: 'N03AX16', tekst: 'Pregabalin', w: 2, minAge: 18 },
+      { kode: 'H03AA01', tekst: 'Levotyroksin', w: 3, minAge: 20 },
+      { kode: 'G03AA12', tekst: 'P-pille (drospirenon/etinyløstradiol)', w: 3, sex: '2', minAge: 15, maxAge: 50 },
+      { kode: 'N06AA09', tekst: 'Amitriptylin', w: 1, minAge: 18 }
+    ],
+    kommuner: [
+      { kode: '0301', navn: 'Oslo' }, { kode: '4601', navn: 'Bergen' },
+      { kode: '5001', navn: 'Trondheim' }, { kode: '1103', navn: 'Stavanger' },
+      { kode: '4204', navn: 'Kristiansand' }, { kode: '3301', navn: 'Drammen' },
+      { kode: '3203', navn: 'Asker' }, { kode: '3201', navn: 'Bærum' },
+      { kode: '3205', navn: 'Lillestrøm' }, { kode: '3107', navn: 'Fredrikstad' },
+      { kode: '1108', navn: 'Sandnes' }, { kode: '5501', navn: 'Tromsø' },
+      { kode: '3105', navn: 'Sarpsborg' }, { kode: '4003', navn: 'Skien' },
+      { kode: '1508', navn: 'Ålesund' }, { kode: '3907', navn: 'Sandefjord' },
+      { kode: '1106', navn: 'Haugesund' }, { kode: '3905', navn: 'Tønsberg' },
+      { kode: '3103', navn: 'Moss' }, { kode: '1804', navn: 'Bodø' },
+      { kode: '4203', navn: 'Arendal' }, { kode: '3403', navn: 'Hamar' },
+      { kode: '3909', navn: 'Larvik' }, { kode: '3101', navn: 'Halden' },
+      { kode: '1506', navn: 'Molde' }, { kode: '3405', navn: 'Lillehammer' },
+      { kode: '3407', navn: 'Gjøvik' }, { kode: '3303', navn: 'Kongsberg' },
+      { kode: '4001', navn: 'Porsgrunn' }, { kode: '1804', navn: 'Bodø' }
+    ],
+    institusjoner: [
+      { kode: '1001', navn: 'Oslo universitetssykehus' },
+      { kode: '1002', navn: 'Akershus universitetssykehus' },
+      { kode: '1003', navn: 'St. Olavs hospital' },
+      { kode: '1004', navn: 'Haukeland universitetssjukehus' },
+      { kode: '1005', navn: 'Universitetssykehuset Nord-Norge' },
+      { kode: '1006', navn: 'Stavanger universitetssjukehus' },
+      { kode: '1007', navn: 'Sørlandet sykehus' },
+      { kode: '1008', navn: 'Vestre Viken' },
+      { kode: '1009', navn: 'Sykehuset Innlandet' },
+      { kode: '1010', navn: 'Nordlandssykehuset' }
+    ],
+    takster: [
+      { kode: '2ad', w: 8 }, { kode: '2ae', w: 2 }, { kode: '2cd', w: 2 },
+      { kode: '2dd', w: 4 }, { kode: '1ad', w: 2 }, { kode: '1bd', w: 3 },
+      { kode: '701a', w: 1 }, { kode: '615', w: 1 }
+    ],
+    ytelser: ['sykepenger', 'uforetrygd', 'dagpenger', 'AAP'],
+    nus: ['1', '2', '3', '4', '5', '6', '7', '8'],
+    sivilstand: [
+      { kode: '1', tekst: 'Ugift' }, { kode: '2', tekst: 'Gift' },
+      { kode: '3', tekst: 'Enke/enkemann' }, { kode: '4', tekst: 'Skilt' },
+      { kode: '5', tekst: 'Separert' }
+    ]
+  };
+})(window.DG);
+```
+
+Merk: fjern duplikatet av Bodø (1804) — den skal bare stå én gang i `kommuner`.
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 39 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: kodelister — ICD-10, ICPC-2, ATC, kommuner, institusjoner, takster m.m."
+```
+
+---
+
+### Task 6: Populasjon og samvariasjonshjelpere
+
+**Files:**
+- Modify: `datagenerator.html` (MOTOR- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `DG.makeRng`, `DG.CODELISTS`, `DG.randomDate`, `DG.dateToStr`.
+- Produces:
+  - Konstanter: `DG.STUDY_FROM = '2015-01-01'`, `DG.STUDY_TO = '2024-12-31'`, `DG.REF_YEAR = 2024`, `DG.AGE_BUCKETS`.
+  - `DG.makePopulation(n:number, rng) -> personRow[]` der `personRow = {lopenr, kjonn, fodselsaar, bostedskommune, dodsdato}` (alle strenger; `dodsdato` er `''` for levende). `POP_ORDER = ['lopenr','kjonn','fodselsaar','bostedskommune','dodsdato']` eksporteres som `DG.POP_ORDER`.
+  - `DG.ageOf(person) -> number` — alder i REF_YEAR.
+  - `DG.pickCoded(list, rng, person) -> entry` — vektet trekk fra kodeliste filtrert på personens kjønn/alder.
+  - `DG.eventDate(rng, person) -> Date` — dato i studieperioden, aldri før fødselsår, aldri etter dodsdato.
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('makePopulation: riktige felter og deterministisk', () => {
+    const a = DG.makePopulation(50, DG.makeRng(21));
+    const b = DG.makePopulation(50, DG.makeRng(21));
+    DG.assertEq(a, b);
+    DG.assertEq(a.length, 50);
+    DG.assertEq(Object.keys(a[0]), ['lopenr', 'kjonn', 'fodselsaar', 'bostedskommune', 'dodsdato']);
+    DG.assertEq(a[0].lopenr, '1'); DG.assertEq(a[49].lopenr, '50');
+  });
+  DG.test('makePopulation: rimelige verdier', () => {
+    const pop = DG.makePopulation(300, DG.makeRng(22));
+    for (const p of pop) {
+      DG.assert(p.kjonn === '1' || p.kjonn === '2');
+      const y = Number(p.fodselsaar);
+      DG.assert(y >= DG.REF_YEAR - 100 && y <= DG.REF_YEAR, 'fodselsaar ' + p.fodselsaar);
+      DG.assert(DG.CODELISTS.kommuner.some(k => k.kode === p.bostedskommune));
+      if (p.dodsdato) DG.assert(p.dodsdato >= DG.STUDY_FROM && p.dodsdato <= DG.STUDY_TO);
+    }
+    const dead = pop.filter(p => p.dodsdato).length;
+    DG.assert(dead < 100, 'for mange døde: ' + dead);
+    const women = pop.filter(p => p.kjonn === '2').length;
+    DG.assert(women > 100 && women < 200, 'skjev kjønnsfordeling: ' + women);
+  });
+  DG.test('pickCoded: respekterer kjønn og alder', () => {
+    const rng = DG.makeRng(23);
+    const mann40 = { kjonn: '1', fodselsaar: String(DG.REF_YEAR - 40) };
+    for (let i = 0; i < 200; i++) {
+      const c = DG.pickCoded(DG.CODELISTS.icd10, rng, mann40);
+      DG.assert(c.sex !== '2', 'mann fikk kvinne-kode ' + c.kode);
+      if (c.minAge !== undefined) DG.assert(c.minAge <= 40, 'for ung for ' + c.kode);
+      if (c.maxAge !== undefined) DG.assert(c.maxAge >= 40, 'for gammel for ' + c.kode);
+    }
+  });
+  DG.test('eventDate: aldri etter dodsdato, aldri før fødselsår', () => {
+    const rng = DG.makeRng(24);
+    const p = { kjonn: '2', fodselsaar: '2020', dodsdato: '2022-06-15' };
+    for (let i = 0; i < 200; i++) {
+      const d = DG.dateToStr(DG.eventDate(rng, p));
+      DG.assert(d >= '2020-01-01' && d <= '2022-06-15', 'fikk ' + d);
+    }
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.makePopulation` er undefined.
+
+- [ ] **Step 3: Implementer i MOTOR-blokken**
+
+Merk: `makePopulation` bruker `DG.CODELISTS` som defineres i DATALAG-blokken (kjører etter MOTOR-blokken) — det er greit fordi funksjonen først KALLES etter at alt er lastet.
+
+```js
+  // --- populasjon og samvariasjon ---
+  DG.STUDY_FROM = '2015-01-01';
+  DG.STUDY_TO = '2024-12-31';
+  DG.REF_YEAR = 2024;
+  DG.POP_ORDER = ['lopenr', 'kjonn', 'fodselsaar', 'bostedskommune', 'dodsdato'];
+  // grov norsk alderspyramide (vekter i prosent)
+  DG.AGE_BUCKETS = [
+    { min: 0, max: 9, w: 11 }, { min: 10, max: 19, w: 12 }, { min: 20, max: 29, w: 13 },
+    { min: 30, max: 39, w: 14 }, { min: 40, max: 49, w: 13 }, { min: 50, max: 59, w: 13 },
+    { min: 60, max: 69, w: 11 }, { min: 70, max: 79, w: 8 }, { min: 80, max: 89, w: 4 },
+    { min: 90, max: 100, w: 1 }
+  ];
+
+  DG.ageOf = (person) => DG.REF_YEAR - parseInt(person.fodselsaar, 10);
+
+  DG.makePopulation = function (n, rng) {
+    const rows = [];
+    const bucketW = DG.AGE_BUCKETS.map(b => b.w);
+    for (let i = 1; i <= n; i++) {
+      const b = rng.weightedChoice(DG.AGE_BUCKETS, bucketW);
+      const age = rng.randint(b.min, b.max);
+      const kjonn = rng.random() < 0.5 ? '1' : '2';
+      const kommune = rng.choice(DG.CODELISTS.kommuner).kode;
+      const pDead = age < 50 ? 0.002 : age < 70 ? 0.02 : age < 80 ? 0.08 : 0.25;
+      const dodsdato = rng.random() < pDead
+        ? DG.dateToStr(DG.randomDate(rng, DG.STUDY_FROM, DG.STUDY_TO)) : '';
+      rows.push({
+        lopenr: String(i), kjonn, fodselsaar: String(DG.REF_YEAR - age),
+        bostedskommune: kommune, dodsdato
+      });
+    }
+    return rows;
+  };
+
+  DG.pickCoded = function (list, rng, person) {
+    const age = DG.ageOf(person);
+    const ok = list.filter(c =>
+      (!c.sex || c.sex === person.kjonn) &&
+      (c.minAge === undefined || age >= c.minAge) &&
+      (c.maxAge === undefined || age <= c.maxAge));
+    if (!ok.length) return list[0];
+    return rng.weightedChoice(ok, ok.map(c => c.w ?? 1));
+  };
+
+  DG.eventDate = function (rng, person) {
+    let from = DG.STUDY_FROM;
+    const birthFrom = person.fodselsaar + '-01-01';
+    if (birthFrom > from) from = birthFrom;
+    let to = person.dodsdato || DG.STUDY_TO;
+    if (to < from) to = from;
+    return DG.randomDate(rng, from, to);
+  };
+```
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 43 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: populasjonsgenerator med alderspyramide, dødsdato og samvariasjonshjelpere"
+```
+
+---
+
+### Task 7: Presets — NPR og Legemiddelregisteret
+
+**Files:**
+- Modify: `datagenerator.html` (DATALAG- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: `DG.makePopulation`, `DG.pickCoded`, `DG.eventDate`, `DG.CODELISTS`, `DG.ageOf`, rng.
+- Produces: `DG.PRESETS` — array av preset-objekter:
+  ```
+  {
+    id: string,                      // 'npr', 'lmr', ...
+    nameNo: string, nameEn: string,
+    params: [{key, labelNo, labelEn, default, min, max, step}],
+    make(pop, rng, params) -> {order:string[], rows:object[]},
+    builderSpec() -> spec[]          // kolonnespec-tilnærming for «Tilpass»-broen
+  }
+  ```
+- `builderSpec()` er en FORENKLING: samme variabelnavn og kodelister, men uten
+  tverr-kolonne-regler (samvariasjon finnes bare i `make`). Dette er den avtalte
+  broen mellom fane 1 og fane 2.
+- Alle rows-verdier er strenger. `lopenr` refererer til populasjonen (koblbarhet).
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('PRESETS: npr og lmr finnes med riktig form', () => {
+    for (const id of ['npr', 'lmr']) {
+      const p = DG.PRESETS.find(x => x.id === id);
+      DG.assert(p, id + ' mangler');
+      DG.assert(typeof p.make === 'function' && typeof p.builderSpec === 'function');
+      DG.assert(Array.isArray(p.builderSpec()), 'builderSpec skal gi array');
+    }
+  });
+  DG.test('npr: koblbar, gyldige koder, ingen hendelser etter død', () => {
+    const rng = DG.makeRng(31);
+    const pop = DG.makePopulation(300, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'innDato', 'utDato', 'hoveddiagnose', 'bidiagnose1', 'omsorgsnivaa', 'institusjonID']);
+    DG.assert(ds.rows.length > 50, 'for få NPR-rader: ' + ds.rows.length);
+    for (const r of ds.rows) {
+      const person = byId[r.lopenr];
+      DG.assert(person, 'ukjent lopenr ' + r.lopenr);
+      DG.assert(r.innDato <= r.utDato, 'utDato før innDato');
+      if (person.dodsdato) DG.assert(r.innDato <= person.dodsdato, 'innleggelse etter død');
+      DG.assert(DG.CODELISTS.icd10.some(c => c.kode === r.hoveddiagnose), 'ukjent diagnose ' + r.hoveddiagnose);
+    }
+  });
+  DG.test('npr: svangerskaps-/fødselskoder bare hos kvinner', () => {
+    const rng = DG.makeRng(32);
+    const pop = DG.makePopulation(400, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 2 });
+    for (const r of ds.rows) {
+      if (r.hoveddiagnose === 'O80' || r.hoveddiagnose === 'C50.9') DG.assertEq(byId[r.lopenr].kjonn, '2', r.hoveddiagnose + ' hos mann');
+      if (r.hoveddiagnose === 'C61') DG.assertEq(byId[r.lopenr].kjonn, '1', 'C61 hos kvinne');
+    }
+  });
+  DG.test('npr: eldre har flere innleggelser enn unge (samvariasjon)', () => {
+    const rng = DG.makeRng(33);
+    const pop = DG.makePopulation(600, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'npr').make(pop, rng, { intensitet: 1 });
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    let young = 0, old = 0, nYoung = 0, nOld = 0;
+    for (const p of pop) { if (DG.ageOf(p) < 30) nYoung++; else if (DG.ageOf(p) >= 65) nOld++; }
+    for (const r of ds.rows) { const a = DG.ageOf(byId[r.lopenr]); if (a < 30) young++; else if (a >= 65) old++; }
+    DG.assert(old / Math.max(nOld, 1) > young / Math.max(nYoung, 1), 'eldre skal ha høyere rate');
+  });
+  DG.test('lmr: koblbar, gyldige ATC-koder, riktige kolonner', () => {
+    const rng = DG.makeRng(34);
+    const pop = DG.makePopulation(300, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'lmr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'utleveringsDato', 'atcKode', 'ddd', 'antallPakninger']);
+    DG.assert(ds.rows.length > 100, 'for få LMR-rader');
+    for (const r of ds.rows) {
+      DG.assert(byId[r.lopenr], 'ukjent lopenr');
+      DG.assert(DG.CODELISTS.atc.some(c => c.kode === r.atcKode), 'ukjent ATC ' + r.atcKode);
+      DG.assert(Number(r.ddd) > 0 && Number(r.antallPakninger) >= 1);
+      const person = byId[r.lopenr];
+      if (person.dodsdato) DG.assert(r.utleveringsDato <= person.dodsdato, 'utlevering etter død');
+    }
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — `DG.PRESETS` er undefined.
+
+- [ ] **Step 3: Implementer NPR og LMR i DATALAG-blokken (etter CODELISTS)**
+
+```js
+  DG.PRESETS = [];
+
+  // --- NPR (somatiske sykehusopphold) ---
+  DG.PRESETS.push({
+    id: 'npr', nameNo: 'NPR (sykehusopphold)', nameEn: 'NPR (hospital episodes)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'innDato', 'utDato', 'hoveddiagnose', 'bidiagnose1', 'omsorgsnivaa', 'institusjonID'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (0.15 + age / 60);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          const inn = DG.eventDate(rng, p);
+          let ut = new Date(inn.getTime() + rng.poisson(2) * 86400000);
+          if (p.dodsdato && DG.dateToStr(ut) > p.dodsdato) ut = new Date(Date.parse(p.dodsdato));
+          rows.push({
+            lopenr: p.lopenr,
+            innDato: DG.dateToStr(inn),
+            utDato: DG.dateToStr(ut),
+            hoveddiagnose: DG.pickCoded(DG.CODELISTS.icd10, rng, p).kode,
+            bidiagnose1: rng.random() < 0.4 ? DG.pickCoded(DG.CODELISTS.icd10, rng, p).kode : '',
+            omsorgsnivaa: rng.weightedChoice(['1', '2', '3'], [0.5, 0.15, 0.35]),
+            institusjonID: rng.choice(DG.CODELISTS.institusjoner).kode
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'innDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'utDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'hoveddiagnose', type: 'list', params: { values: DG.CODELISTS.icd10.map(c => c.kode), weights: DG.CODELISTS.icd10.map(c => c.w) } },
+        { name: 'bidiagnose1', type: 'list', params: { values: DG.CODELISTS.icd10.map(c => c.kode) }, missing: 0.6 },
+        { name: 'omsorgsnivaa', type: 'list', params: { values: ['1', '2', '3'], weights: [0.5, 0.15, 0.35] } },
+        { name: 'institusjonID', type: 'list', params: { values: DG.CODELISTS.institusjoner.map(c => c.kode) } }
+      ];
+    }
+  });
+
+  // --- Legemiddelregisteret (utleveringer) ---
+  DG.PRESETS.push({
+    id: 'lmr', nameNo: 'Legemiddelregisteret (utleveringer)', nameEn: 'Prescription register (dispensings)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'utleveringsDato', 'atcKode', 'ddd', 'antallPakninger'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (0.5 + age / 25);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          rows.push({
+            lopenr: p.lopenr,
+            utleveringsDato: DG.dateToStr(DG.eventDate(rng, p)),
+            atcKode: DG.pickCoded(DG.CODELISTS.atc, rng, p).kode,
+            ddd: String(rng.randint(10, 100)),
+            antallPakninger: String(rng.weightedChoice([1, 2, 3], [0.7, 0.2, 0.1]))
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'utleveringsDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'atcKode', type: 'list', params: { values: DG.CODELISTS.atc.map(c => c.kode), weights: DG.CODELISTS.atc.map(c => c.w) } },
+        { name: 'ddd', type: 'number', params: { min: 10, max: 100 } },
+        { name: 'antallPakninger', type: 'list', params: { values: ['1', '2', '3'], weights: [0.7, 0.2, 0.1] } }
+      ];
+    }
+  });
+```
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 48 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: presets for NPR og Legemiddelregisteret med samvariasjon"
+```
+
+---
+
+### Task 8: Presets — KUHR, SSB og FD-trygd
+
+**Files:**
+- Modify: `datagenerator.html` (DATALAG- og TESTER-blokkene)
+
+**Interfaces:**
+- Consumes: samme som Task 7. Preset-formen fra Task 7 gjelder.
+- Produces: tre nye innslag i `DG.PRESETS`:
+  - `kuhr`: order `['lopenr','dato','diagnoseICPC2','takstkode','refusjonsbelop']`
+  - `ssb`: order `['lopenr','fodselsaar','kjonn','bostedskommune','sivilstand','utdanningsnivaa','samletInntekt']` — ÉN rad per person
+  - `fdtrygd`: order `['lopenr','fomDato','tomDato','ytelse','uforegrad']` — `tomDato` er `''` for løpende uføretrygd; `uforegrad` er `''` for alle andre ytelser enn uforetrygd
+
+- [ ] **Step 1: Skriv feilende tester**
+
+```js
+  DG.test('kuhr: koblbar og gyldige ICPC-2-koder', () => {
+    const rng = DG.makeRng(41);
+    const pop = DG.makePopulation(200, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'kuhr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'dato', 'diagnoseICPC2', 'takstkode', 'refusjonsbelop']);
+    DG.assert(ds.rows.length > 100);
+    for (const r of ds.rows) {
+      DG.assert(byId[r.lopenr]);
+      DG.assert(DG.CODELISTS.icpc2.some(c => c.kode === r.diagnoseICPC2), 'ukjent ICPC-2 ' + r.diagnoseICPC2);
+      DG.assert(DG.CODELISTS.takster.some(c => c.kode === r.takstkode));
+      DG.assert(Number(r.refusjonsbelop) >= 50);
+      const person = byId[r.lopenr];
+      if (person.dodsdato) DG.assert(r.dato <= person.dodsdato, 'kontakt etter død');
+    }
+  });
+  DG.test('ssb: én rad per person, konsistent med populasjonen', () => {
+    const rng = DG.makeRng(42);
+    const pop = DG.makePopulation(150, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'ssb').make(pop, rng, {});
+    DG.assertEq(ds.order, ['lopenr', 'fodselsaar', 'kjonn', 'bostedskommune', 'sivilstand', 'utdanningsnivaa', 'samletInntekt']);
+    DG.assertEq(ds.rows.length, 150);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    for (const r of ds.rows) {
+      DG.assertEq(r.fodselsaar, byId[r.lopenr].fodselsaar, 'fodselsaar avviker fra populasjonen');
+      DG.assertEq(r.kjonn, byId[r.lopenr].kjonn);
+      DG.assert(DG.CODELISTS.sivilstand.some(s => s.kode === r.sivilstand));
+      DG.assert(DG.CODELISTS.nus.includes(r.utdanningsnivaa));
+    }
+  });
+  DG.test('ssb: barn har 0 i inntekt og er ugift', () => {
+    const rng = DG.makeRng(43);
+    const pop = DG.makePopulation(400, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'ssb').make(pop, rng, {});
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    for (const r of ds.rows) {
+      if (DG.ageOf(byId[r.lopenr]) < 18) {
+        DG.assertEq(r.samletInntekt, '0', 'barn med inntekt');
+        DG.assertEq(r.sivilstand, '1', 'barn ikke ugift');
+      }
+    }
+  });
+  DG.test('fdtrygd: uforegrad bare ved uforetrygd, gyldige ytelser', () => {
+    const rng = DG.makeRng(44);
+    const pop = DG.makePopulation(500, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'fdtrygd').make(pop, rng, {});
+    DG.assertEq(ds.order, ['lopenr', 'fomDato', 'tomDato', 'ytelse', 'uforegrad']);
+    DG.assert(ds.rows.length > 20, 'for få trygdespell: ' + ds.rows.length);
+    for (const r of ds.rows) {
+      DG.assert(DG.CODELISTS.ytelser.includes(r.ytelse), 'ukjent ytelse ' + r.ytelse);
+      if (r.ytelse === 'uforetrygd') {
+        DG.assert(r.uforegrad === '50' || r.uforegrad === '100');
+        DG.assert(DG.ageOf(byId[r.lopenr]) >= 18, 'uforetrygd til barn');
+      } else {
+        DG.assertEq(r.uforegrad, '');
+        DG.assert(r.tomDato >= r.fomDato, 'tomDato før fomDato');
+      }
+    }
+  });
+```
+
+- [ ] **Step 2: Kjør testene — forvent feil**
+
+Run: `node tests/run_tests.mjs`
+Expected: FAIL — finner ikke preset `kuhr`.
+
+- [ ] **Step 3: Implementer i DATALAG-blokken (etter lmr-preset)**
+
+```js
+  // --- KUHR (primærhelsetjeneste/fastlege) ---
+  DG.PRESETS.push({
+    id: 'kuhr', nameNo: 'KUHR (fastlegekontakter)', nameEn: 'KUHR (GP contacts)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'dato', 'diagnoseICPC2', 'takstkode', 'refusjonsbelop'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (1 + age / 40);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          let belop = Math.round(rng.normal(350, 150));
+          if (belop < 50) belop = 50;
+          rows.push({
+            lopenr: p.lopenr,
+            dato: DG.dateToStr(DG.eventDate(rng, p)),
+            diagnoseICPC2: DG.pickCoded(DG.CODELISTS.icpc2, rng, p).kode,
+            takstkode: rng.weightedChoice(DG.CODELISTS.takster, DG.CODELISTS.takster.map(t => t.w)).kode,
+            refusjonsbelop: String(belop)
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'dato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'diagnoseICPC2', type: 'list', params: { values: DG.CODELISTS.icpc2.map(c => c.kode), weights: DG.CODELISTS.icpc2.map(c => c.w) } },
+        { name: 'takstkode', type: 'list', params: { values: DG.CODELISTS.takster.map(t => t.kode), weights: DG.CODELISTS.takster.map(t => t.w) } },
+        { name: 'refusjonsbelop', type: 'number', params: { dist: 'normal', mean: 350, sd: 150, min: 50 } }
+      ];
+    }
+  });
+
+  // --- SSB (demografi og sosioøkonomi, én rad per person) ---
+  DG.PRESETS.push({
+    id: 'ssb', nameNo: 'SSB (demografi/inntekt)', nameEn: 'Statistics Norway (demographics/income)',
+    params: [],
+    make(pop, rng) {
+      const order = ['lopenr', 'fodselsaar', 'kjonn', 'bostedskommune', 'sivilstand', 'utdanningsnivaa', 'samletInntekt'];
+      const rows = pop.map(p => {
+        const age = DG.ageOf(p);
+        let sivilstand, nus, inntekt;
+        if (age < 18) {
+          sivilstand = '1';
+          nus = age < 6 ? '0' : age < 13 ? '1' : '2';
+          inntekt = 0;
+        } else {
+          sivilstand = rng.weightedChoice(['1', '2', '3', '4', '5'],
+            age < 30 ? [0.8, 0.15, 0, 0.04, 0.01]
+              : age < 67 ? [0.25, 0.5, 0.02, 0.18, 0.05]
+                : [0.1, 0.5, 0.25, 0.14, 0.01]);
+          nus = rng.weightedChoice(['2', '3', '4', '5', '6', '7', '8'],
+            [0.05, 0.15, 0.25, 0.05, 0.3, 0.17, 0.03]);
+          const mean = age < 30 ? 350000 : age < 67 ? 550000 : 300000;
+          inntekt = Math.max(0, Math.round(rng.normal(mean, 150000) / 1000) * 1000);
+        }
+        return {
+          lopenr: p.lopenr, fodselsaar: p.fodselsaar, kjonn: p.kjonn,
+          bostedskommune: p.bostedskommune, sivilstand,
+          utdanningsnivaa: nus, samletInntekt: String(inntekt)
+        };
+      });
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'fodselsaar', type: 'number', params: { min: 1924, max: 2024 } },
+        { name: 'kjonn', type: 'list', params: { values: ['1', '2'] } },
+        { name: 'bostedskommune', type: 'list', params: { values: DG.CODELISTS.kommuner.map(k => k.kode) } },
+        { name: 'sivilstand', type: 'list', params: { values: DG.CODELISTS.sivilstand.map(s => s.kode) } },
+        { name: 'utdanningsnivaa', type: 'list', params: { values: DG.CODELISTS.nus } },
+        { name: 'samletInntekt', type: 'number', params: { dist: 'normal', mean: 500000, sd: 150000, min: 0 } }
+      ];
+    }
+  });
+
+  // --- FD-trygd (trygdespell) ---
+  DG.PRESETS.push({
+    id: 'fdtrygd', nameNo: 'FD-trygd (trygdeytelser)', nameEn: 'FD-trygd (welfare benefits)',
+    params: [],
+    make(pop, rng) {
+      const order = ['lopenr', 'fomDato', 'tomDato', 'ytelse', 'uforegrad'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        if (age < 18 || age > 67) continue;
+        // uføretrygd: sannsynlighet stiger med alder; løpende (tomDato tom)
+        const pUfor = age < 40 ? 0.02 : 0.05 + (age - 40) * 0.01;
+        if (rng.random() < pUfor) {
+          rows.push({
+            lopenr: p.lopenr,
+            fomDato: DG.dateToStr(DG.eventDate(rng, p)),
+            tomDato: p.dodsdato || '',
+            ytelse: 'uforetrygd',
+            uforegrad: rng.weightedChoice(['50', '100'], [0.4, 0.6])
+          });
+          continue; // uføre får ikke andre ytelser i denne forenklingen
+        }
+        // sykepenger: kortere spell, kan ha flere
+        const nSyk = rng.poisson(0.3);
+        for (let s = 0; s < nSyk; s++) {
+          const fom = DG.eventDate(rng, p);
+          let tom = new Date(fom.getTime() + rng.randint(14, 250) * 86400000);
+          const cap = p.dodsdato || DG.STUDY_TO;
+          if (DG.dateToStr(tom) > cap) tom = new Date(Date.parse(cap));
+          rows.push({ lopenr: p.lopenr, fomDato: DG.dateToStr(fom), tomDato: DG.dateToStr(tom), ytelse: 'sykepenger', uforegrad: '' });
+        }
+        // dagpenger og AAP: lav sannsynlighet
+        for (const yt of ['dagpenger', 'AAP']) {
+          if (rng.random() < 0.06) {
+            const fom = DG.eventDate(rng, p);
+            let tom = new Date(fom.getTime() + rng.randint(30, 365) * 86400000);
+            const cap = p.dodsdato || DG.STUDY_TO;
+            if (DG.dateToStr(tom) > cap) tom = new Date(Date.parse(cap));
+            rows.push({ lopenr: p.lopenr, fomDato: DG.dateToStr(fom), tomDato: DG.dateToStr(tom), ytelse: yt, uforegrad: '' });
+          }
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'fomDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'tomDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'ytelse', type: 'list', params: { values: DG.CODELISTS.ytelser } },
+        { name: 'uforegrad', type: 'list', params: { values: ['50', '100'] }, missing: 0.8 }
+      ];
+    }
+  });
+```
+
+Merk: `nus`-listen i CODELISTS har ikke `'0'` — SSB-presetens barnegren bruker `'0'` for førskolebarn. Utvid `DG.CODELISTS.nus` til `['0','1','2','3','4','5','6','7','8']` og juster testen fra Task 5 hvis den feiler på dette.
+
+- [ ] **Step 4: Kjør testene — forvent grønt**
+
+Run: `node tests/run_tests.mjs`
+Expected: `OK: 52 tester besto`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: presets for KUHR, SSB og FD-trygd"
+```
+
+---
+
+### Task 9: UI-skjelett — CSS, topplinje, faner, i18n og selftest-banner
+
+**Files:**
+- Modify: `datagenerator.html` (`<style>`, `#app`, UI-blokken)
+
+**Interfaces:**
+- Consumes: `DG.runTests` (selftest-banner).
+- Produces (brukes av Task 10 og 11):
+  - `t(key) -> string` og `T` (ordbok), `state.lang` (`'no'`/`'en'`), `setLang(lang)` — oppdaterer alle `[data-i18n]`-elementer og kaller `rerenderDynamic()` (tom hook nå, fylles i Task 10/11).
+  - `state = { lang:'no', datasets:null, activeDataset:null, builderCols:[], builderResult:null }`
+  - `getN() -> number` og `getSeed() -> string` — leser topplinje-feltene (`#inp-n`, `#inp-seed`).
+  - `el(tag, className, text) -> HTMLElement` — alltid `textContent`, aldri `innerHTML` for dynamiske verdier.
+  - `downloadBlob(filename, blob)` og `downloadCsv(basename, ds)` — ds er `{order, rows}`; CSV får BOM her.
+  - Faneskjelett: knappene `#tab-btn-presets`/`#tab-btn-builder` bytter mellom `#tab-presets`/`#tab-builder`; `showTab(id)` eksponeres.
+
+- [ ] **Step 1: Fyll `<style>`-blokken**
+
+```css
+:root {
+  --accent: #1a6e63; --accent-light: #e3f2ef; --border: #d8dee4;
+  --bg: #f6f8f9; --card: #ffffff; --text: #1f2d3a; --muted: #667788; --error: #b3261e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+header.topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.7rem 1.2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+header.topbar h1 { font-size: 1.15rem; margin: 0 auto 0 0; color: var(--accent); }
+header.topbar label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+header.topbar input { width: 6rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; }
+.lang-switch button { border: 1px solid var(--border); background: var(--card); padding: 0.25rem 0.6rem; cursor: pointer; }
+.lang-switch button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lang-switch button:first-child { border-radius: 6px 0 0 6px; }
+.lang-switch button:last-child { border-radius: 0 6px 6px 0; }
+nav.tabs { display: flex; gap: 0.4rem; padding: 0.8rem 1.2rem 0; }
+nav.tabs button { border: 1px solid var(--border); border-bottom: none; background: #eceff2; padding: 0.5rem 1.1rem; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.95rem; }
+nav.tabs button.active { background: var(--card); font-weight: 600; color: var(--accent); }
+main { padding: 1rem 1.2rem 3rem; }
+.tabpanel[hidden] { display: none; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.8rem; }
+.card h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.8rem; }
+button.primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 0.55rem 1.3rem; font-size: 1rem; cursor: pointer; }
+button.primary:hover { filter: brightness(1.1); }
+button.ghost { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.9rem; cursor: pointer; }
+.error-text { color: var(--error); font-size: 0.85rem; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+.sample { font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--accent); overflow-wrap: anywhere; }
+.dataset-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin: 0.8rem 0 0.5rem; }
+.dataset-tabs button { border: 1px solid var(--border); background: #eceff2; border-radius: 6px; padding: 0.3rem 0.8rem; cursor: pointer; font-size: 0.85rem; }
+.dataset-tabs button.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+.field-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.4rem; }
+.field-row label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--muted); gap: 0.15rem; }
+.field-row input, .field-row select, .field-row textarea { padding: 0.3rem 0.45rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+#selftest-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 99; padding: 0.6rem 1rem; color: #fff; font-weight: 600; }
+#selftest-banner.ok { background: #1a7f37; }
+#selftest-banner.fail { background: var(--error); }
+.tabulator { border-radius: 8px; border: 1px solid var(--border); }
+```
+
+- [ ] **Step 2: Fyll `#app` med statisk markup**
+
+```html
+<div id="app">
+  <header class="topbar">
+    <h1 data-i18n="appTitle">Datagenerator</h1>
+    <label><span data-i18n="nPersons">Antall personer</span>
+      <input id="inp-n" type="number" value="500" min="1" max="100000"></label>
+    <label><span data-i18n="seed">Seed</span>
+      <input id="inp-seed" type="text" value="42"></label>
+    <span class="lang-switch">
+      <button id="lang-no" class="active">NO</button><button id="lang-en">EN</button>
+    </span>
+  </header>
+  <nav class="tabs">
+    <button id="tab-btn-presets" class="active" data-i18n="tabPresets">Ferdige datasett</button>
+    <button id="tab-btn-builder" data-i18n="tabBuilder">Bygg selv</button>
+  </nav>
+  <main>
+    <section id="tab-presets" class="tabpanel">
+      <p class="muted" data-i18n="presetsIntro">Velg registre, sett antall personer og seed, og trykk Generer. Alle filene kan kobles på lopenr.</p>
+      <div id="preset-cards" class="cards-grid"></div>
+      <div class="toolbar">
+        <button id="btn-generate-presets" class="primary" data-i18n="generate">Generer</button>
+        <button id="btn-zip-all" class="ghost" data-i18n="downloadAll" disabled>Last ned alle (zip)</button>
+      </div>
+      <div id="dataset-tabs" class="dataset-tabs"></div>
+      <div id="dataset-toolbar" class="toolbar"></div>
+      <div id="dataset-table"></div>
+    </section>
+    <section id="tab-builder" class="tabpanel" hidden>
+      <p class="muted" data-i18n="builderIntro">Bygg et datasett kolonne for kolonne. Eksempler oppdateres mens du skriver.</p>
+      <div id="builder-cols"></div>
+      <div class="toolbar">
+        <button id="btn-add-col" class="ghost" data-i18n="addColumn">+ Legg til kolonne</button>
+        <button id="btn-generate-builder" class="primary" data-i18n="generate">Generer</button>
+        <button id="btn-save-spec" class="ghost" data-i18n="saveSpec">Lagre oppskrift (JSON)</button>
+        <label class="ghost" style="padding:0.4rem 0.9rem; cursor:pointer; border:1px solid var(--border); border-radius:8px;">
+          <span data-i18n="loadSpec">Last oppskrift</span>
+          <input id="inp-load-spec" type="file" accept=".json" style="display:none">
+        </label>
+      </div>
+      <div id="builder-errors"></div>
+      <div class="toolbar" id="builder-export" hidden>
+        <button id="btn-dl-builder-csv" class="ghost">CSV</button>
+        <button id="btn-dl-builder-json" class="ghost">JSON</button>
+        <button id="btn-copy-builder" class="ghost" data-i18n="copy">Kopier</button>
+        <span id="builder-rowinfo" class="muted"></span>
+      </div>
+      <div id="builder-table"></div>
+    </section>
+  </main>
+</div>
+```
+
+- [ ] **Step 3: Fyll UI-blokken med i18n, faner, hjelpere og selftest-banner**
+
+```js
+(function () {
+  'use strict';
+  const DG = window.DG;
+  DG.regexLib = window.RandExp || null;
+
+  // --- i18n ---
+  const T = {
+    no: {
+      appTitle: 'Datagenerator', nPersons: 'Antall personer', seed: 'Seed',
+      tabPresets: 'Ferdige datasett', tabBuilder: 'Bygg selv',
+      presetsIntro: 'Velg registre, sett antall personer og seed, og trykk Generer. Alle filene kan kobles på lopenr.',
+      builderIntro: 'Bygg et datasett kolonne for kolonne. Eksempler oppdateres mens du skriver.',
+      generate: 'Generer', downloadAll: 'Last ned alle (zip)', downloadCsv: 'Last ned CSV',
+      copy: 'Kopier', copied: 'Kopiert!', addColumn: '+ Legg til kolonne',
+      saveSpec: 'Lagre oppskrift (JSON)', loadSpec: 'Last oppskrift',
+      customize: 'Tilpass', population: 'Populasjon', delete: 'Slett',
+      colName: 'Navn', colType: 'Type', tieTo: 'Stabil per', missing: '% missing',
+      showingRows: (a, b) => `viser ${a} av ${b} rader`, rows: 'rader',
+      typeNames: { recipe: 'Oppskrift', example: 'Eksempel', regex: 'Regex', list: 'Liste', number: 'Tall', date: 'Dato', sequence: 'Sekvens', constant: 'Konstant' }
+    },
+    en: {
+      appTitle: 'Data generator', nPersons: 'Number of persons', seed: 'Seed',
+      tabPresets: 'Ready-made datasets', tabBuilder: 'Build your own',
+      presetsIntro: 'Select registries, set population size and seed, then press Generate. All files link on lopenr.',
+      builderIntro: 'Build a dataset column by column. Samples update as you type.',
+      generate: 'Generate', downloadAll: 'Download all (zip)', downloadCsv: 'Download CSV',
+      copy: 'Copy', copied: 'Copied!', addColumn: '+ Add column',
+      saveSpec: 'Save recipe (JSON)', loadSpec: 'Load recipe',
+      customize: 'Customize', population: 'Population', delete: 'Delete',
+      colName: 'Name', colType: 'Type', tieTo: 'Stable per', missing: '% missing',
+      showingRows: (a, b) => `showing ${a} of ${b} rows`, rows: 'rows',
+      typeNames: { recipe: 'Recipe', example: 'Example', regex: 'Regex', list: 'List', number: 'Number', date: 'Date', sequence: 'Sequence', constant: 'Constant' }
+    }
+  };
+  const state = { lang: 'no', datasets: null, activeDataset: null, builderCols: [], builderResult: null };
+  const t = (key) => T[state.lang][key] ?? key;
+
+  function setLang(lang) {
+    state.lang = lang;
+    document.getElementById('lang-no').classList.toggle('active', lang === 'no');
+    document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+    document.querySelectorAll('[data-i18n]').forEach(node => {
+      const v = t(node.dataset.i18n);
+      if (typeof v === 'string') node.textContent = v;
+    });
+    rerenderDynamic();
+  }
+  // Task 10/11 registrerer re-render-funksjoner her:
+  const dynamicRenderers = [];
+  function rerenderDynamic() { dynamicRenderers.forEach(fn => fn()); }
+
+  // --- hjelpere ---
+  const el = (tag, className, text) => {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const getN = () => Math.max(1, parseInt(document.getElementById('inp-n').value, 10) || 500);
+  const getSeed = () => document.getElementById('inp-seed').value || '42';
+
+  function downloadBlob(filename, blob) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  const csvBlob = (ds) => new Blob(['\ufeff' + DG.toCsv(ds.order, ds.rows)], { type: 'text/csv;charset=utf-8' });
+  const downloadCsv = (basename, ds) => downloadBlob(basename + '.csv', csvBlob(ds));
+
+  // --- faner ---
+  function showTab(id) {
+    document.getElementById('tab-presets').hidden = id !== 'presets';
+    document.getElementById('tab-builder').hidden = id !== 'builder';
+    document.getElementById('tab-btn-presets').classList.toggle('active', id === 'presets');
+    document.getElementById('tab-btn-builder').classList.toggle('active', id === 'builder');
+  }
+  document.getElementById('tab-btn-presets').addEventListener('click', () => showTab('presets'));
+  document.getElementById('tab-btn-builder').addEventListener('click', () => showTab('builder'));
+  document.getElementById('lang-no').addEventListener('click', () => setLang('no'));
+  document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
+
+  // --- selftest-banner (?selftest) ---
+  if (location.search.includes('selftest')) {
+    const res = DG.runTests();
+    const banner = el('div', null,
+      res.failed ? `${res.failed} av ${res.total} tester FEILET — se konsollen` : `Selvtest OK: ${res.total} tester besto`);
+    banner.id = 'selftest-banner';
+    banner.className = res.failed ? 'fail' : 'ok';
+    document.body.prepend(banner);
+    res.failures.forEach(f => console.error('SELFTEST FEIL: ' + f.name + ' — ' + f.message));
+  }
+
+  // Task 10/11 henger seg på dette delte skopet:
+  window._ui = { T, t, state, setLang, el, getN, getSeed, downloadBlob, downloadCsv, csvBlob, showTab, dynamicRenderers };
+})();
+```
+
+- [ ] **Step 4: Verifiser i nettleser og med node**
+
+Run: `node tests/run_tests.mjs` — fortsatt grønt.
+Åpne `datagenerator.html` i nettleser (file://): topplinje, faneknapper som bytter panel, språkbryter som bytter alle labels, ingen konsollfeil. Åpne `datagenerator.html?selftest`: grønt banner med antall tester.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: UI-skjelett med faner, i18n (no/en) og selftest-banner"
+```
+
+---
+
+### Task 10: Fane 1 — Ferdige datasett
+
+**Files:**
+- Modify: `datagenerator.html` (UI-blokken, etter Task 9-koden — nytt IIFE som leser `window._ui`)
+
+**Interfaces:**
+- Consumes: `window._ui` (Task 9), `DG.PRESETS`, `DG.makePopulation`, `DG.POP_ORDER`, `DG.makeRng`, `DG.toCsv`, Tabulator (`window.Tabulator`), JSZip (`window.JSZip`).
+- Produces: `window._ui.openInBuilder(specs)` forventes definert av Task 11 — Task 10 kaller den fra «Tilpass»-knappen (hvis udefinert: knappen disables). Datasett-navn til filer: `populasjon`, `npr`, `lmr`, `kuhr`, `ssb`, `fdtrygd`.
+
+- [ ] **Step 1: Implementer preset-kort og generering**
+
+Nytt IIFE i UI-blokken:
+
+```js
+(function () {
+  'use strict';
+  const DG = window.DG;
+  const U = window._ui;
+  const { el, t } = U;
+  let table = null; // aktiv Tabulator-instans
+
+  // --- preset-kort ---
+  function renderPresetCards() {
+    const wrap = document.getElementById('preset-cards');
+    wrap.textContent = '';
+    for (const preset of DG.PRESETS) {
+      const card = el('div', 'card');
+      const head = el('label', null);
+      const cb = el('input');
+      cb.type = 'checkbox'; cb.checked = true; cb.dataset.preset = preset.id;
+      head.appendChild(cb);
+      head.appendChild(el('strong', null, ' ' + (U.state.lang === 'no' ? preset.nameNo : preset.nameEn)));
+      card.appendChild(head);
+      for (const prm of preset.params) {
+        const lab = el('label', null, (U.state.lang === 'no' ? prm.labelNo : prm.labelEn) + ' ');
+        const inp = el('input');
+        inp.type = 'number'; inp.value = prm.default;
+        inp.min = prm.min; inp.max = prm.max; inp.step = prm.step;
+        inp.dataset.preset = preset.id; inp.dataset.param = prm.key;
+        inp.style.width = '5rem';
+        lab.appendChild(inp);
+        card.appendChild(el('div')).appendChild(lab);
+      }
+      const btn = el('button', 'ghost', t('customize'));
+      btn.addEventListener('click', () => {
+        if (U.openInBuilder) { U.openInBuilder(preset.builderSpec()); U.showTab('builder'); }
+      });
+      card.appendChild(btn);
+      wrap.appendChild(card);
+    }
+  }
+  renderPresetCards();
+  U.dynamicRenderers.push(renderPresetCards);
+
+  // --- generering ---
+  function generate() {
+    const n = U.getN(), seed = U.getSeed();
+    const rng = DG.makeRng(seed);
+    const pop = DG.makePopulation(n, rng);
+    const datasets = { populasjon: { order: DG.POP_ORDER, rows: pop } };
+    for (const preset of DG.PRESETS) {
+      const cb = document.querySelector(`input[type=checkbox][data-preset=${preset.id}]`);
+      if (!cb || !cb.checked) continue;
+      const params = {};
+      document.querySelectorAll(`input[data-preset=${preset.id}][data-param]`).forEach(inp => {
+        params[inp.dataset.param] = Number(inp.value);
+      });
+      datasets[preset.id] = preset.make(pop, rng, params);
+    }
+    U.state.datasets = datasets;
+    U.state.activeDataset = 'populasjon';
+    document.getElementById('btn-zip-all').disabled = false;
+    renderDatasetTabs();
+  }
+  document.getElementById('btn-generate-presets').addEventListener('click', generate);
+
+  // --- visning ---
+  function datasetLabel(id) {
+    if (id === 'populasjon') return t('population');
+    const p = DG.PRESETS.find(x => x.id === id);
+    return p ? (U.state.lang === 'no' ? p.nameNo : p.nameEn) : id;
+  }
+
+  function renderDatasetTabs() {
+    const tabs = document.getElementById('dataset-tabs');
+    tabs.textContent = '';
+    if (!U.state.datasets) return;
+    for (const id of Object.keys(U.state.datasets)) {
+      const btn = el('button', id === U.state.activeDataset ? 'active' : null, datasetLabel(id));
+      btn.addEventListener('click', () => { U.state.activeDataset = id; renderDatasetTabs(); });
+      tabs.appendChild(btn);
+    }
+    renderActiveDataset();
+  }
+  U.dynamicRenderers.push(renderDatasetTabs);
+
+  function renderActiveDataset() {
+    const id = U.state.activeDataset;
+    const toolbar = document.getElementById('dataset-toolbar');
+    toolbar.textContent = '';
+    if (!id || !U.state.datasets || !U.state.datasets[id]) return;
+    const ds = U.state.datasets[id];
+
+    const dl = el('button', 'ghost', t('downloadCsv'));
+    dl.addEventListener('click', () => U.downloadCsv(id, ds));
+    const cp = el('button', 'ghost', t('copy'));
+    cp.addEventListener('click', () => {
+      navigator.clipboard.writeText(DG.toCsv(ds.order, ds.rows)).then(() => {
+        cp.textContent = t('copied');
+        setTimeout(() => { cp.textContent = t('copy'); }, 1500);
+      });
+    });
+    toolbar.appendChild(dl);
+    toolbar.appendChild(cp);
+    toolbar.appendChild(el('span', 'muted', T_showing(ds.rows.length)));
+
+    if (table) { table.destroy(); table = null; }
+    table = new Tabulator('#dataset-table', {
+      data: ds.rows.slice(0, 50),
+      autoColumns: true,
+      layout: 'fitDataStretch',
+      height: '420px'
+    });
+  }
+  function T_showing(total) {
+    const shown = Math.min(50, total);
+    return U.T[U.state.lang].showingRows(shown, total);
+  }
+
+  // --- zip-alle ---
+  document.getElementById('btn-zip-all').addEventListener('click', async () => {
+    if (!U.state.datasets) return;
+    const zip = new JSZip();
+    for (const [id, ds] of Object.entries(U.state.datasets)) {
+      zip.file(id + '.csv', '\ufeff' + DG.toCsv(ds.order, ds.rows));
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    U.downloadBlob('syntetiske_data.zip', blob);
+  });
+})();
+```
+
+- [ ] **Step 2: Verifiser i nettleser**
+
+Run: `node tests/run_tests.mjs` — fortsatt grønt.
+I nettleser: (1) alle 5 preset-kort + populasjon vises; (2) «Generer» med n=500, seed=42 gir under ett sekunds ventetid og seks datasett-underfaner; (3) Tabulator viser data, underfanene bytter; (4) CSV-nedlasting for NPR åpner med riktige kolonnenavn; (5) zip inneholder 6 csv-filer; (6) «Kopier» gir CSV på utklippstavlen; (7) trykk «Generer» to ganger med samme seed → identiske data (sjekk første rad); (8) språkbryter oppdaterer kort og faner.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: fane 1 — ferdige datasett med Tabulator-forhåndsvisning, CSV/zip/utklippstavle"
+```
+
+---
+
+### Task 11: Fane 2 — Bygg selv
+
+**Files:**
+- Modify: `datagenerator.html` (UI-blokken, nytt IIFE etter Task 10-koden)
+
+**Interfaces:**
+- Consumes: `window._ui`, `DG.buildDataset`, `DG.generators`, `DG.toCsv`, Tabulator.
+- Produces: `window._ui.openInBuilder(specs)` — setter kolonnelisten og re-rendrer (kalles av «Tilpass» i Task 10).
+- localStorage-nøkkel: `dg_builder_v1` (JSON: `{cols: spec[]}`); lagres ved hver endring, leses ved oppstart.
+- Param-felter per type (`PARAM_FIELDS`): recipe/example/regex → `pattern` (tekst); list → `values` (textarea, én verdi per linje) og `weights` (tekst, kommaseparert, valgfri); number → `dist` (select uniform/normal), `min`, `max`, `mean`, `sd`, `decimals`; date → `from`, `to`; sequence → `start`, `step`; constant → `value`.
+
+- [ ] **Step 1: Implementer kolonnebyggeren**
+
+```js
+(function () {
+  'use strict';
+  const DG = window.DG;
+  const U = window._ui;
+  const { el, t } = U;
+  let table = null;
+
+  const TYPES = ['recipe', 'example', 'regex', 'list', 'number', 'date', 'sequence', 'constant'];
+  const PARAM_FIELDS = {
+    recipe: [{ key: 'pattern', kind: 'text', ph: '[A,B][x,y;p=(0.8,0.2)][1-3]' }],
+    example: [{ key: 'pattern', kind: 'text', ph: 'K50.1' }],
+    regex: [{ key: 'pattern', kind: 'text', ph: '[A-Z]\\d{2}\\.\\d' }],
+    list: [{ key: 'values', kind: 'textarea', ph: 'a\nb\nc' }, { key: 'weights', kind: 'text', ph: '0.5, 0.3, 0.2' }],
+    number: [{ key: 'dist', kind: 'select', options: ['uniform', 'normal'] }, { key: 'min', kind: 'number' }, { key: 'max', kind: 'number' }, { key: 'mean', kind: 'number' }, { key: 'sd', kind: 'number' }, { key: 'decimals', kind: 'number' }],
+    date: [{ key: 'from', kind: 'text', ph: '2015-01-01' }, { key: 'to', kind: 'text', ph: '2024-12-31' }],
+    sequence: [{ key: 'start', kind: 'number' }, { key: 'step', kind: 'number' }],
+    constant: [{ key: 'value', kind: 'text' }]
+  };
+
+  function defaultCol() {
+    return { name: 'col_' + (U.state.builderCols.length + 1), type: 'recipe', params: { pattern: '[A-C][1-9]' } };
+  }
+
+  function saveLocal() {
+    try { localStorage.setItem('dg_builder_v1', JSON.stringify({ cols: U.state.builderCols })); } catch (e) { /* privat modus o.l. */ }
+  }
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem('dg_builder_v1');
+      if (raw) { const d = JSON.parse(raw); if (Array.isArray(d.cols)) U.state.builderCols = d.cols; }
+    } catch (e) { /* korrupt lagring ignoreres */ }
+  }
+
+  // params <-> inputverdier. list.values lagres som array; i UI vises én per linje.
+  function paramToInput(spec, key) {
+    const v = (spec.params || {})[key];
+    if (key === 'values' && Array.isArray(v)) return v.join('\n');
+    if (key === 'weights' && Array.isArray(v)) return v.join(', ');
+    return v ?? '';
+  }
+  function inputToParam(spec, key, raw) {
+    if (raw === '' || raw == null) { delete spec.params[key]; return; }
+    if (key === 'values') spec.params.values = String(raw).split('\n').map(s => s.trim()).filter(Boolean);
+    else if (key === 'weights') spec.params.weights = String(raw).split(',').map(s => parseFloat(s.trim())).filter(x => !isNaN(x));
+    else if (key === 'dist' || key === 'pattern' || key === 'from' || key === 'to' || key === 'value') spec.params[key] = String(raw);
+    else spec.params[key] = Number(raw);
+  }
+
+  function renderCols() {
+    const wrap = document.getElementById('builder-cols');
+    wrap.textContent = '';
+    U.state.builderCols.forEach((spec, idx) => {
+      const card = el('div', 'card');
+      const row = el('div', 'field-row');
+
+      const nameLab = el('label', null, t('colName'));
+      const nameInp = el('input'); nameInp.value = spec.name;
+      nameInp.addEventListener('input', () => { spec.name = nameInp.value; onChange(false); });
+      nameLab.appendChild(nameInp); row.appendChild(nameLab);
+
+      const typeLab = el('label', null, t('colType'));
+      const typeSel = el('select');
+      for (const ty of TYPES) {
+        const o = el('option', null, U.T[U.state.lang].typeNames[ty]); o.value = ty;
+        if (ty === spec.type) o.selected = true;
+        typeSel.appendChild(o);
+      }
+      typeSel.addEventListener('change', () => { spec.type = typeSel.value; spec.params = {}; renderCols(); onChange(false); });
+      typeLab.appendChild(typeSel); row.appendChild(typeLab);
+
+      for (const f of PARAM_FIELDS[spec.type]) {
+        const lab = el('label', null, f.key);
+        let inp;
+        if (f.kind === 'textarea') { inp = el('textarea'); inp.rows = 3; }
+        else if (f.kind === 'select') {
+          inp = el('select');
+          for (const opt of f.options) { const o = el('option', null, opt); o.value = opt; inp.appendChild(o); }
+        } else { inp = el('input'); if (f.kind === 'number') inp.type = 'number'; }
+        if (f.ph) inp.placeholder = f.ph;
+        inp.value = paramToInput(spec, f.key);
+        inp.addEventListener('input', () => { inputToParam(spec, f.key, inp.value); onChange(true, card, idx); });
+        lab.appendChild(inp); row.appendChild(lab);
+      }
+
+      const tieLab = el('label', null, t('tieTo'));
+      const tieSel = el('select');
+      tieSel.appendChild(el('option', null, '—')).value = '';
+      U.state.builderCols.slice(0, idx).forEach(c => {
+        const o = el('option', null, c.name); o.value = c.name;
+        if (c.name === spec.tieTo) o.selected = true;
+        tieSel.appendChild(o);
+      });
+      tieSel.addEventListener('change', () => { spec.tieTo = tieSel.value || undefined; onChange(false); });
+      tieLab.appendChild(tieSel); row.appendChild(tieLab);
+
+      const misLab = el('label', null, t('missing'));
+      const misInp = el('input'); misInp.type = 'number'; misInp.min = 0; misInp.max = 100; misInp.style.width = '4.5rem';
+      misInp.value = spec.missing ? Math.round(spec.missing * 100) : '';
+      misInp.addEventListener('input', () => {
+        const pct = parseFloat(misInp.value);
+        if (isNaN(pct) || pct <= 0) delete spec.missing; else spec.missing = Math.min(pct, 100) / 100;
+        onChange(false);
+      });
+      misLab.appendChild(misInp); row.appendChild(misLab);
+
+      const del = el('button', 'ghost', t('delete'));
+      del.addEventListener('click', () => { U.state.builderCols.splice(idx, 1); renderCols(); onChange(false); });
+      row.appendChild(del);
+
+      card.appendChild(row);
+      card.appendChild(el('div', 'sample', ''));
+      card.appendChild(el('div', 'error-text', ''));
+      wrap.appendChild(card);
+    });
+    updateSamples();
+  }
+  U.dynamicRenderers.push(renderCols);
+
+  // live-eksempler: 5 rader med fast seed, felles for alle kolonner (tieTo trenger naboene)
+  function updateSamples() {
+    const wrap = document.getElementById('builder-cols');
+    const ds = DG.buildDataset(U.state.builderCols, 5, 'sample');
+    [...wrap.children].forEach((card, idx) => {
+      const spec = U.state.builderCols[idx];
+      const sample = card.querySelector('.sample');
+      const err = card.querySelector('.error-text');
+      const e = ds.errors.find(x => x.column === spec.name);
+      if (e) { sample.textContent = ''; err.textContent = e.message; }
+      else { err.textContent = ''; sample.textContent = (ds.columns[spec.name] || []).join('  ·  '); }
+    });
+  }
+
+  let sampleTimer = null;
+  function onChange(debounce) {
+    saveLocal();
+    if (debounce) { clearTimeout(sampleTimer); sampleTimer = setTimeout(updateSamples, 250); }
+    else updateSamples();
+  }
+
+  // --- generering og eksport ---
+  function generate() {
+    const ds = DG.buildDataset(U.state.builderCols, U.getN(), U.getSeed());
+    U.state.builderResult = ds;
+    const errBox = document.getElementById('builder-errors');
+    errBox.textContent = '';
+    ds.errors.forEach(e => errBox.appendChild(el('div', 'error-text', e.column + ': ' + e.message)));
+    document.getElementById('builder-export').hidden = false;
+    document.getElementById('builder-rowinfo').textContent = ds.rows.length + ' ' + t('rows');
+    if (table) { table.destroy(); table = null; }
+    table = new Tabulator('#builder-table', {
+      data: ds.rows.slice(0, 50), autoColumns: true, layout: 'fitDataStretch', height: '420px'
+    });
+  }
+  document.getElementById('btn-generate-builder').addEventListener('click', generate);
+  document.getElementById('btn-add-col').addEventListener('click', () => {
+    U.state.builderCols.push(defaultCol()); renderCols(); saveLocal();
+  });
+  document.getElementById('btn-dl-builder-csv').addEventListener('click', () => {
+    if (U.state.builderResult) U.downloadCsv('egendefinert', U.state.builderResult);
+  });
+  document.getElementById('btn-dl-builder-json').addEventListener('click', () => {
+    if (!U.state.builderResult) return;
+    U.downloadBlob('egendefinert.json',
+      new Blob([JSON.stringify(U.state.builderResult.rows, null, 1)], { type: 'application/json' }));
+  });
+  document.getElementById('btn-copy-builder').addEventListener('click', function () {
+    if (!U.state.builderResult) return;
+    const ds = U.state.builderResult;
+    navigator.clipboard.writeText(DG.toCsv(ds.order, ds.rows)).then(() => {
+      this.textContent = t('copied');
+      setTimeout(() => { this.textContent = t('copy'); }, 1500);
+    });
+  });
+
+  // --- lagre/laste oppskrift ---
+  document.getElementById('btn-save-spec').addEventListener('click', () => {
+    U.downloadBlob('oppskrift.json',
+      new Blob([JSON.stringify({ cols: U.state.builderCols }, null, 1)], { type: 'application/json' }));
+  });
+  document.getElementById('inp-load-spec').addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    file.text().then(text => {
+      try {
+        const d = JSON.parse(text);
+        if (!Array.isArray(d.cols)) throw new Error('mangler cols');
+        U.state.builderCols = d.cols;
+        renderCols(); saveLocal();
+      } catch (e) {
+        const errBox = document.getElementById('builder-errors');
+        errBox.textContent = '';
+        errBox.appendChild(el('div', 'error-text', 'Kunne ikke lese oppskriften: ' + e.message));
+      }
+    });
+    this.value = '';
+  });
+
+  // --- broen fra fane 1 ---
+  U.openInBuilder = function (specs) {
+    U.state.builderCols = JSON.parse(JSON.stringify(specs));
+    renderCols(); saveLocal();
+  };
+
+  // --- oppstart ---
+  loadLocal();
+  if (!U.state.builderCols.length) U.state.builderCols = [defaultCol()];
+  renderCols();
+})();
+```
+
+- [ ] **Step 2: Verifiser i nettleser**
+
+Run: `node tests/run_tests.mjs` — fortsatt grønt.
+I nettleser: (1) én standardkolonne med live-eksempel vises; (2) endre pattern → eksempler oppdateres (debounced), ugyldig pattern (`[a,b;p=(2,3)]`) → rød feilmelding inline; (3) legg til tall-, dato- og listekolonne; (4) tieTo mot første kolonne gir stabile verdier; (5) % missing 20 gir tomme celler; (6) «Generer» viser Tabulator og eksport-knapper, CSV/JSON/kopier fungerer; (7) «Lagre oppskrift» + «Last oppskrift» går rundtur; (8) reload av siden husker kolonnene (localStorage); (9) «Tilpass» på NPR-kortet i fane 1 fyller byggeren med NPR-kolonnene; (10) språkbryter oppdaterer kortene.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add datagenerator.html
+git commit -m "feat: fane 2 — kolonnebygger med live-eksempler, eksport, JSON-oppskrifter og Tilpass-bro"
+```
+
+---
+
+### Task 12: Sluttverifisering, README og opprydding
+
+**Files:**
+- Modify: `README.md`
+- Modify: `datagenerator.html` (bare hvis verifiseringen avdekker feil)
+
+- [ ] **Step 1: Kjør full selvtest i nettleser**
+
+Åpne `datagenerator.html?selftest` i nettleser. Forvent grønt banner. Dette
+verifiserer det node ikke kan: at EKTE RandExp fungerer med seeded randInt-override.
+Hvis regex-tester feiler kun i nettleser: sjekk at `DG.regexLib = window.RandExp`
+settes ETTER at CDN-scriptet er lastet (script-rekkefølgen i `<body>`).
+
+- [ ] **Step 2: Verifiser suksesskriteriene fra spec-en**
+
+1. Fra fersk side: huk av NPR + SSB, Generer, last ned begge → under ett minutt. Åpne filene og sjekk at `lopenr`-verdiene overlapper.
+2. Generer to ganger med seed 42 → diff de to nedlastede CSV-filene (`diff fil1.csv fil2.csv` → identiske).
+3. Lim inn Anvil-syntaks `[A,B][x,y,z;p=(0.8,0.1,0.1)][1-3][.][0-9]` i en oppskrift-kolonne → gyldige koder.
+4. Test siden fra `file://` (dobbeltklikk) — alt fungerer med nett tilgjengelig.
+
+- [ ] **Step 3: Oppdater README**
+
+Legg denne seksjonen ØVERST i `README.md` (behold Anvil-teksten under som historikk):
+
+```markdown
+# Datagenerator
+
+Syntetiske norske registerdata (NPR, Legemiddelregisteret, KUHR, SSB, FD-trygd)
+og egendefinerte testdatasett — i én selvstendig HTML-side.
+
+**Bruk:** åpne `datagenerator.html` i en nettleser (eller legg den på GitHub
+Pages/Netlify). Velg registre og trykk Generer, eller bygg egne kolonner i
+«Bygg selv»-fanen. Alle registerfiler kan kobles på `lopenr`. Samme seed gir
+identiske data. Dataene er 100 % syntetiske.
+
+**Utvikling:** motoren er ren JS i `<script data-node-testable>`-blokker;
+kjør testene med `node tests/run_tests.mjs`. Selvtest i nettleser:
+`datagenerator.html?selftest`.
+
+---
+
+*(Resten av denne README-en beskriver den gamle Anvil-appen, som beholdes
+som referanse i `client_code/` og `server_code/`.)*
+```
+
+- [ ] **Step 4: Siste testkjøring og commit**
+
+Run: `node tests/run_tests.mjs`
+Expected: alle tester grønne.
+
+```bash
+git add README.md datagenerator.html
+git commit -m "docs: README for standalone datagenerator; sluttverifisering"
+```
+
+---
+
+## Self-review-notater (utført ved planskriving)
+
+- Spec-dekning: alle spec-seksjoner har oppgaver — motor (Task 1–4), kodelister (5), populasjon/samvariasjon (6), presets (7–8), UI/i18n/faner (9), fane 1 med eksport (10), fane 2 med JSON-oppskrifter og Tilpass-bro (11), selvtest og suksesskriterier (12).
+- «Tilpass»-broen er en bevisst forenkling (builderSpec uten samvariasjon) — avklart i planens Task 7-interfaces.
+- Kjente avvik å se opp for under kjøring: testantall («Expected: OK: N tester besto») kan avvike med ±1–2 hvis en oppgave legger til flere/færre tester enn anslått — det som teller er GRØNT, ikke eksakt antall.
+- `kommuner` har en duplikat-Bodø i kodeblokken i Task 5 — steget sier eksplisitt at den skal fjernes.
+- `nus`-listen utvides med `'0'` i Task 8 (se merknad der).
