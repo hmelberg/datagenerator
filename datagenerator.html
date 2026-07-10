@@ -315,6 +315,10 @@ window.DG = (function () {
     const rng = DG.makeRng(seed);
     const columns = {}, order = [], errors = [];
     for (const spec of specs) {
+      if (columns[spec.name] !== undefined) {
+        errors.push({ column: spec.name, message: 'kolonnenavnet er brukt flere ganger: ' + spec.name });
+        continue;
+      }
       try {
         columns[spec.name] = DG.generateColumn(spec, n, rng, columns);
         order.push(spec.name);
@@ -961,6 +965,15 @@ window.DG = (function () {
     DG.assertEq(ds.errors.length, 1);
     DG.assertEq(ds.errors[0].column, 'krasj');
   });
+  DG.test('buildDataset: duplikat kolonnenavn gir feil, ikke stille overskriving', () => {
+    const ds = DG.buildDataset([
+      { name: 'a', type: 'constant', params: { value: '1' } },
+      { name: 'a', type: 'constant', params: { value: '2' } }
+    ], 2, 1);
+    DG.assertEq(ds.order, ['a']);
+    DG.assertEq(ds.columns.a, ['1', '1']);
+    DG.assertEq(ds.errors.length, 1);
+  });
   DG.test('buildDataset: samme seed gir identisk resultat', () => {
     const specs = [{ name: 'n', type: 'number', params: { min: 0, max: 1000 } }];
     DG.assertEq(DG.buildDataset(specs, 20, 'frø'), DG.buildDataset(specs, 20, 'frø'));
@@ -1411,7 +1424,9 @@ window.DG = (function () {
       };
 
       function defaultCol() {
-        return { name: 'col_' + (U.state.builderCols.length + 1), type: 'recipe', params: { pattern: '[A-C][1-9]' } };
+        let i = U.state.builderCols.length + 1;
+        while (U.state.builderCols.some(c => c.name === 'col_' + i)) i++;
+        return { name: 'col_' + i, type: 'recipe', params: { pattern: '[A-C][1-9]' } };
       }
 
       function saveLocal() {
@@ -1497,7 +1512,12 @@ window.DG = (function () {
           misLab.appendChild(misInp); row.appendChild(misLab);
 
           const del = el('button', 'ghost', t('delete'));
-          del.addEventListener('click', () => { U.state.builderCols.splice(idx, 1); renderCols(); onChange(false); });
+          del.addEventListener('click', () => {
+            U.state.builderCols.splice(idx, 1);
+            const deletedName = spec.name;
+            U.state.builderCols.forEach(c => { if (c.tieTo === deletedName) delete c.tieTo; });
+            renderCols(); onChange(false);
+          });
           row.appendChild(del);
 
           card.appendChild(row);
