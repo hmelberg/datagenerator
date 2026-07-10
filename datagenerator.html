@@ -259,6 +259,165 @@ window.DG = (function () {
 
 <script data-node-testable>
 /* ===== DATALAG (kodelister og presets) — fylles i Task 5, 7, 8 ===== */
+(function (DG) {
+  'use strict';
+  DG.CODELISTS = {
+    icd10: [
+      { kode: 'J06.9', tekst: 'Akutt øvre luftveisinfeksjon', w: 8 },
+      { kode: 'J18.9', tekst: 'Pneumoni', w: 5 },
+      { kode: 'J03.9', tekst: 'Akutt tonsillitt', w: 3, maxAge: 40 },
+      { kode: 'J45.9', tekst: 'Astma', w: 4 },
+      { kode: 'J44.9', tekst: 'KOLS', w: 3, minAge: 45 },
+      { kode: 'A09', tekst: 'Gastroenteritt', w: 3 },
+      { kode: 'I10', tekst: 'Essensiell hypertensjon', w: 7, minAge: 30 },
+      { kode: 'I21.9', tekst: 'Akutt hjerteinfarkt', w: 3, minAge: 40 },
+      { kode: 'I25.1', tekst: 'Aterosklerotisk hjertesykdom', w: 3, minAge: 45 },
+      { kode: 'I50.9', tekst: 'Hjertesvikt', w: 3, minAge: 50 },
+      { kode: 'I63.9', tekst: 'Hjerneinfarkt', w: 2, minAge: 45 },
+      { kode: 'I48.9', tekst: 'Atrieflimmer', w: 3, minAge: 50 },
+      { kode: 'E11.9', tekst: 'Diabetes type 2', w: 4, minAge: 30 },
+      { kode: 'E10.9', tekst: 'Diabetes type 1', w: 1 },
+      { kode: 'E66.9', tekst: 'Fedme', w: 2 },
+      { kode: 'C50.9', tekst: 'Brystkreft', w: 2, sex: '2', minAge: 30 },
+      { kode: 'C61', tekst: 'Prostatakreft', w: 2, sex: '1', minAge: 50 },
+      { kode: 'C34.9', tekst: 'Lungekreft', w: 1, minAge: 40 },
+      { kode: 'C18.9', tekst: 'Tykktarmskreft', w: 1, minAge: 40 },
+      { kode: 'K35.8', tekst: 'Akutt appendisitt', w: 2, maxAge: 50 },
+      { kode: 'K50.9', tekst: 'Crohns sykdom', w: 1 },
+      { kode: 'K51.9', tekst: 'Ulcerøs kolitt', w: 1 },
+      { kode: 'K80.2', tekst: 'Gallestein', w: 2, minAge: 25 },
+      { kode: 'K21.9', tekst: 'Gastroøsofageal refluks', w: 2 },
+      { kode: 'N39.0', tekst: 'Urinveisinfeksjon', w: 4 },
+      { kode: 'N20.0', tekst: 'Nyrestein', w: 2, minAge: 20 },
+      { kode: 'M54.5', tekst: 'Lumbago', w: 6, minAge: 18 },
+      { kode: 'M16.9', tekst: 'Hofteartrose', w: 3, minAge: 50 },
+      { kode: 'M17.9', tekst: 'Kneartrose', w: 3, minAge: 45 },
+      { kode: 'S52.5', tekst: 'Brudd i distale radius', w: 3 },
+      { kode: 'S72.0', tekst: 'Lårhalsbrudd', w: 2, minAge: 60 },
+      { kode: 'S06.0', tekst: 'Hjernerystelse', w: 2 },
+      { kode: 'F32.9', tekst: 'Depressiv episode', w: 4, minAge: 15 },
+      { kode: 'F41.9', tekst: 'Angstlidelse', w: 4, minAge: 15 },
+      { kode: 'F10.2', tekst: 'Alkoholavhengighet', w: 2, minAge: 18 },
+      { kode: 'F20.9', tekst: 'Schizofreni', w: 1, minAge: 18 },
+      { kode: 'G40.9', tekst: 'Epilepsi', w: 1 },
+      { kode: 'G35', tekst: 'Multippel sklerose', w: 1, minAge: 20, maxAge: 60 },
+      { kode: 'G20', tekst: 'Parkinsons sykdom', w: 1, minAge: 55 },
+      { kode: 'G30.9', tekst: 'Alzheimers sykdom', w: 2, minAge: 65 },
+      { kode: 'O80', tekst: 'Spontan fødsel', w: 3, sex: '2', minAge: 16, maxAge: 45 },
+      { kode: 'H25.9', tekst: 'Senil katarakt', w: 2, minAge: 60 },
+      { kode: 'H66.9', tekst: 'Mellomørebetennelse', w: 3, maxAge: 20 },
+      { kode: 'R07.4', tekst: 'Brystsmerter', w: 3 },
+      { kode: 'R10.4', tekst: 'Magesmerter', w: 4 },
+      { kode: 'R55', tekst: 'Synkope', w: 2 },
+      { kode: 'Z51.1', tekst: 'Kjemoterapi', w: 1, minAge: 30 }
+    ],
+    icpc2: [
+      { kode: 'R74', tekst: 'Øvre luftveisinfeksjon', w: 8 },
+      { kode: 'R05', tekst: 'Hoste', w: 5 },
+      { kode: 'R96', tekst: 'Astma', w: 3 },
+      { kode: 'R78', tekst: 'Akutt bronkitt', w: 3 },
+      { kode: 'R97', tekst: 'Allergisk rinitt', w: 3 },
+      { kode: 'L03', tekst: 'Korsryggsymptomer', w: 6, minAge: 15 },
+      { kode: 'L92', tekst: 'Skuldersyndrom', w: 3, minAge: 20 },
+      { kode: 'L84', tekst: 'Ryggsyndrom uten smerteutstråling', w: 2, minAge: 20 },
+      { kode: 'K86', tekst: 'Hypertensjon ukomplisert', w: 6, minAge: 30 },
+      { kode: 'K74', tekst: 'Angina pectoris', w: 2, minAge: 45 },
+      { kode: 'K77', tekst: 'Hjertesvikt', w: 2, minAge: 55 },
+      { kode: 'T90', tekst: 'Diabetes type 2', w: 4, minAge: 30 },
+      { kode: 'P76', tekst: 'Depressiv lidelse', w: 4, minAge: 15 },
+      { kode: 'P74', tekst: 'Angstlidelse', w: 4, minAge: 15 },
+      { kode: 'P06', tekst: 'Søvnforstyrrelse', w: 3, minAge: 15 },
+      { kode: 'A97', tekst: 'Ingen sykdom / helsekontroll', w: 3 },
+      { kode: 'A04', tekst: 'Slapphet/tretthet', w: 3 },
+      { kode: 'W78', tekst: 'Svangerskap', w: 3, sex: '2', minAge: 16, maxAge: 45 },
+      { kode: 'X11', tekst: 'Menopausesymptomer', w: 2, sex: '2', minAge: 45, maxAge: 60 },
+      { kode: 'U71', tekst: 'Cystitt', w: 3 },
+      { kode: 'S88', tekst: 'Kontakteksem', w: 2 },
+      { kode: 'H71', tekst: 'Akutt mellomørebetennelse', w: 3, maxAge: 20 },
+      { kode: 'D73', tekst: 'Gastroenteritt', w: 2 },
+      { kode: 'F70', tekst: 'Konjunktivitt', w: 2 },
+      { kode: 'N01', tekst: 'Hodepine', w: 3 },
+      { kode: 'N89', tekst: 'Migrene', w: 2, minAge: 15 },
+      { kode: 'B80', tekst: 'Jernmangelanemi', w: 1 },
+      { kode: 'D84', tekst: 'Spiserørssykdom', w: 1 },
+      { kode: 'T82', tekst: 'Fedme', w: 2 },
+      { kode: 'K90', tekst: 'Hjerneslag', w: 1, minAge: 50 }
+    ],
+    atc: [
+      { kode: 'N02BE01', tekst: 'Paracetamol', w: 8 },
+      { kode: 'M01AE01', tekst: 'Ibuprofen', w: 6 },
+      { kode: 'N02AA05', tekst: 'Oksykodon', w: 2, minAge: 18 },
+      { kode: 'C10AA05', tekst: 'Atorvastatin', w: 6, minAge: 40 },
+      { kode: 'C10AA01', tekst: 'Simvastatin', w: 3, minAge: 40 },
+      { kode: 'C09CA01', tekst: 'Losartan', w: 3, minAge: 35 },
+      { kode: 'C07AB02', tekst: 'Metoprolol', w: 4, minAge: 35 },
+      { kode: 'C08CA01', tekst: 'Amlodipin', w: 3, minAge: 35 },
+      { kode: 'C03CA01', tekst: 'Furosemid', w: 2, minAge: 50 },
+      { kode: 'B01AC06', tekst: 'Acetylsalisylsyre', w: 4, minAge: 45 },
+      { kode: 'B01AF01', tekst: 'Rivaroksaban', w: 2, minAge: 50 },
+      { kode: 'A02BC01', tekst: 'Omeprazol', w: 4 },
+      { kode: 'A02BC02', tekst: 'Pantoprazol', w: 3 },
+      { kode: 'A10BA02', tekst: 'Metformin', w: 4, minAge: 30 },
+      { kode: 'A10BJ06', tekst: 'Semaglutid', w: 2, minAge: 18 },
+      { kode: 'J01CA04', tekst: 'Amoksicillin', w: 4 },
+      { kode: 'J01CE02', tekst: 'Fenoksymetylpenicillin', w: 5 },
+      { kode: 'J01XE01', tekst: 'Nitrofurantoin', w: 2 },
+      { kode: 'R03AC02', tekst: 'Salbutamol', w: 4 },
+      { kode: 'R03AK06', tekst: 'Salmeterol og flutikason', w: 2 },
+      { kode: 'R06AE07', tekst: 'Cetirizin', w: 3 },
+      { kode: 'N05BA04', tekst: 'Oksazepam', w: 2, minAge: 18 },
+      { kode: 'N05CF01', tekst: 'Zopiklon', w: 3, minAge: 18 },
+      { kode: 'N06AB04', tekst: 'Citalopram', w: 3, minAge: 15 },
+      { kode: 'N06AB10', tekst: 'Escitalopram', w: 3, minAge: 15 },
+      { kode: 'N06AX16', tekst: 'Venlafaksin', w: 2, minAge: 18 },
+      { kode: 'N03AX16', tekst: 'Pregabalin', w: 2, minAge: 18 },
+      { kode: 'H03AA01', tekst: 'Levotyroksin', w: 3, minAge: 20 },
+      { kode: 'G03AA12', tekst: 'P-pille (drospirenon/etinyløstradiol)', w: 3, sex: '2', minAge: 15, maxAge: 50 },
+      { kode: 'N06AA09', tekst: 'Amitriptylin', w: 1, minAge: 18 }
+    ],
+    kommuner: [
+      { kode: '0301', navn: 'Oslo' }, { kode: '4601', navn: 'Bergen' },
+      { kode: '5001', navn: 'Trondheim' }, { kode: '1103', navn: 'Stavanger' },
+      { kode: '4204', navn: 'Kristiansand' }, { kode: '3301', navn: 'Drammen' },
+      { kode: '3203', navn: 'Asker' }, { kode: '3201', navn: 'Bærum' },
+      { kode: '3205', navn: 'Lillestrøm' }, { kode: '3107', navn: 'Fredrikstad' },
+      { kode: '1108', navn: 'Sandnes' }, { kode: '5501', navn: 'Tromsø' },
+      { kode: '3105', navn: 'Sarpsborg' }, { kode: '4003', navn: 'Skien' },
+      { kode: '1508', navn: 'Ålesund' }, { kode: '3907', navn: 'Sandefjord' },
+      { kode: '1106', navn: 'Haugesund' }, { kode: '3905', navn: 'Tønsberg' },
+      { kode: '3103', navn: 'Moss' }, { kode: '1804', navn: 'Bodø' },
+      { kode: '4203', navn: 'Arendal' }, { kode: '3403', navn: 'Hamar' },
+      { kode: '3909', navn: 'Larvik' }, { kode: '3101', navn: 'Halden' },
+      { kode: '1506', navn: 'Molde' }, { kode: '3405', navn: 'Lillehammer' },
+      { kode: '3407', navn: 'Gjøvik' }, { kode: '3303', navn: 'Kongsberg' },
+      { kode: '4001', navn: 'Porsgrunn' }
+    ],
+    institusjoner: [
+      { kode: '1001', navn: 'Oslo universitetssykehus' },
+      { kode: '1002', navn: 'Akershus universitetssykehus' },
+      { kode: '1003', navn: 'St. Olavs hospital' },
+      { kode: '1004', navn: 'Haukeland universitetssjukehus' },
+      { kode: '1005', navn: 'Universitetssykehuset Nord-Norge' },
+      { kode: '1006', navn: 'Stavanger universitetssjukehus' },
+      { kode: '1007', navn: 'Sørlandet sykehus' },
+      { kode: '1008', navn: 'Vestre Viken' },
+      { kode: '1009', navn: 'Sykehuset Innlandet' },
+      { kode: '1010', navn: 'Nordlandssykehuset' }
+    ],
+    takster: [
+      { kode: '2ad', w: 8 }, { kode: '2ae', w: 2 }, { kode: '2cd', w: 2 },
+      { kode: '2dd', w: 4 }, { kode: '1ad', w: 2 }, { kode: '1bd', w: 3 },
+      { kode: '701a', w: 1 }, { kode: '615', w: 1 }
+    ],
+    ytelser: ['sykepenger', 'uforetrygd', 'dagpenger', 'AAP'],
+    nus: ['0', '1', '2', '3', '4', '5', '6', '7', '8'],
+    sivilstand: [
+      { kode: '1', tekst: 'Ugift' }, { kode: '2', tekst: 'Gift' },
+      { kode: '3', tekst: 'Enke/enkemann' }, { kode: '4', tekst: 'Skilt' },
+      { kode: '5', tekst: 'Separert' }
+    ]
+  };
+})(window.DG);
 </script>
 
 <script data-node-testable>
@@ -452,6 +611,29 @@ window.DG = (function () {
   DG.test('toCsv: semikolon, quoting og linjeskift', () => {
     const csv = DG.toCsv(['a', 'b'], [{ a: '1', b: 'x;y' }, { a: '2', b: 'med "fnutt"' }]);
     DG.assertEq(csv, 'a;b\n1;"x;y"\n2;"med ""fnutt"""');
+  });
+
+  DG.test('CODELISTS: alle lister finnes og er ikke-tomme', () => {
+    for (const k of ['icd10', 'icpc2', 'atc', 'kommuner', 'institusjoner', 'takster', 'ytelser', 'nus', 'sivilstand']) {
+      DG.assert(Array.isArray(DG.CODELISTS[k]) && DG.CODELISTS[k].length > 0, k + ' mangler');
+    }
+    DG.assert(DG.CODELISTS.icd10.length >= 40, 'icd10 skal ha minst 40 koder');
+    DG.assert(DG.CODELISTS.atc.length >= 25, 'atc skal ha minst 25 koder');
+    DG.assert(DG.CODELISTS.icpc2.length >= 25, 'icpc2 skal ha minst 25 koder');
+  });
+  DG.test('CODELISTS: gyldige felter og formater', () => {
+    for (const c of DG.CODELISTS.icd10) {
+      DG.assert(/^[A-Z]\d\d(\.\d+)?$/.test(c.kode), 'ugyldig ICD-10-kode: ' + c.kode);
+      DG.assert(typeof c.w === 'number' && c.w > 0, 'vekt mangler for ' + c.kode);
+      if (c.sex) DG.assert(c.sex === '1' || c.sex === '2', 'ugyldig sex for ' + c.kode);
+    }
+    for (const c of DG.CODELISTS.atc) DG.assert(/^[A-Z]\d\d[A-Z]{2}\d\d$/.test(c.kode), 'ugyldig ATC-kode: ' + c.kode);
+    for (const c of DG.CODELISTS.icpc2) DG.assert(/^[A-Z]\d\d$/.test(c.kode), 'ugyldig ICPC-2-kode: ' + c.kode);
+    for (const c of DG.CODELISTS.kommuner) DG.assert(/^\d{4}$/.test(c.kode), 'ugyldig kommunenr: ' + c.kode);
+  });
+  DG.test('CODELISTS: kjønnsbundne koder finnes (svangerskap kvinner, prostata menn)', () => {
+    DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '2'), 'ingen kvinne-koder i icd10');
+    DG.assert(DG.CODELISTS.icd10.some(c => c.sex === '1'), 'ingen mann-koder i icd10');
   });
 })(window.DG);
 </script>
