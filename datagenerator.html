@@ -1257,6 +1257,134 @@ window.DG = (function () {
 
     // Task 10/11 henger seg på dette delte skopet:
     window._ui = { T, t, state, setLang, el, getN, getSeed, downloadBlob, downloadCsv, csvBlob, showTab, dynamicRenderers };
+
+    // --- Task 10: Fane 1 — Ferdige datasett ---
+    (function () {
+      'use strict';
+      const DG = window.DG;
+      const U = window._ui;
+      const { el, t } = U;
+      let table = null; // aktiv Tabulator-instans
+
+      // --- preset-kort ---
+      function renderPresetCards() {
+        const wrap = document.getElementById('preset-cards');
+        wrap.textContent = '';
+        for (const preset of DG.PRESETS) {
+          const card = el('div', 'card');
+          const head = el('label', null);
+          const cb = el('input');
+          cb.type = 'checkbox'; cb.checked = true; cb.dataset.preset = preset.id;
+          head.appendChild(cb);
+          head.appendChild(el('strong', null, ' ' + (U.state.lang === 'no' ? preset.nameNo : preset.nameEn)));
+          card.appendChild(head);
+          for (const prm of preset.params) {
+            const lab = el('label', null, (U.state.lang === 'no' ? prm.labelNo : prm.labelEn) + ' ');
+            const inp = el('input');
+            inp.type = 'number'; inp.value = prm.default;
+            inp.min = prm.min; inp.max = prm.max; inp.step = prm.step;
+            inp.dataset.preset = preset.id; inp.dataset.param = prm.key;
+            inp.style.width = '5rem';
+            lab.appendChild(inp);
+            card.appendChild(el('div')).appendChild(lab);
+          }
+          const btn = el('button', 'ghost', t('customize'));
+          btn.addEventListener('click', () => {
+            if (U.openInBuilder) { U.openInBuilder(preset.builderSpec()); U.showTab('builder'); }
+          });
+          card.appendChild(btn);
+          wrap.appendChild(card);
+        }
+      }
+      renderPresetCards();
+      U.dynamicRenderers.push(renderPresetCards);
+
+      // --- generering ---
+      function generate() {
+        const n = U.getN(), seed = U.getSeed();
+        const rng = DG.makeRng(seed);
+        const pop = DG.makePopulation(n, rng);
+        const datasets = { populasjon: { order: DG.POP_ORDER, rows: pop } };
+        for (const preset of DG.PRESETS) {
+          const cb = document.querySelector(`input[type=checkbox][data-preset=${preset.id}]`);
+          if (!cb || !cb.checked) continue;
+          const params = {};
+          document.querySelectorAll(`input[data-preset=${preset.id}][data-param]`).forEach(inp => {
+            params[inp.dataset.param] = Number(inp.value);
+          });
+          datasets[preset.id] = preset.make(pop, rng, params);
+        }
+        U.state.datasets = datasets;
+        U.state.activeDataset = 'populasjon';
+        document.getElementById('btn-zip-all').disabled = false;
+        renderDatasetTabs();
+      }
+      document.getElementById('btn-generate-presets').addEventListener('click', generate);
+
+      // --- visning ---
+      function datasetLabel(id) {
+        if (id === 'populasjon') return t('population');
+        const p = DG.PRESETS.find(x => x.id === id);
+        return p ? (U.state.lang === 'no' ? p.nameNo : p.nameEn) : id;
+      }
+
+      function renderDatasetTabs() {
+        const tabs = document.getElementById('dataset-tabs');
+        tabs.textContent = '';
+        if (!U.state.datasets) return;
+        for (const id of Object.keys(U.state.datasets)) {
+          const btn = el('button', id === U.state.activeDataset ? 'active' : null, datasetLabel(id));
+          btn.addEventListener('click', () => { U.state.activeDataset = id; renderDatasetTabs(); });
+          tabs.appendChild(btn);
+        }
+        renderActiveDataset();
+      }
+      U.dynamicRenderers.push(renderDatasetTabs);
+
+      function renderActiveDataset() {
+        const id = U.state.activeDataset;
+        const toolbar = document.getElementById('dataset-toolbar');
+        toolbar.textContent = '';
+        if (!id || !U.state.datasets || !U.state.datasets[id]) return;
+        const ds = U.state.datasets[id];
+
+        const dl = el('button', 'ghost', t('downloadCsv'));
+        dl.addEventListener('click', () => U.downloadCsv(id, ds));
+        const cp = el('button', 'ghost', t('copy'));
+        cp.addEventListener('click', () => {
+          navigator.clipboard.writeText(DG.toCsv(ds.order, ds.rows)).then(() => {
+            cp.textContent = t('copied');
+            setTimeout(() => { cp.textContent = t('copy'); }, 1500);
+          });
+        });
+        toolbar.appendChild(dl);
+        toolbar.appendChild(cp);
+        toolbar.appendChild(el('span', 'muted', T_showing(ds.rows.length)));
+
+        if (table) { table.destroy(); table = null; }
+        table = new Tabulator('#dataset-table', {
+          data: ds.rows.slice(0, 50),
+          autoColumns: true,
+          layout: 'fitDataStretch',
+          height: '420px'
+        });
+      }
+      function T_showing(total) {
+        const shown = Math.min(50, total);
+        return U.T[U.state.lang].showingRows(shown, total);
+      }
+
+      // --- zip-alle ---
+      document.getElementById('btn-zip-all').addEventListener('click', async () => {
+        if (!U.state.datasets) return;
+        const zip = new JSZip();
+        for (const [id, ds] of Object.entries(U.state.datasets)) {
+          zip.file(id + '.csv', '\u{FEFF}' + DG.toCsv(ds.order, ds.rows));
+        }
+        const blob = await zip.generateAsync({ type: 'blob' });
+        U.downloadBlob('syntetiske_data.zip', blob);
+      });
+    })();
   });
 })();
 </script>
