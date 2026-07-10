@@ -1269,19 +1269,23 @@ window.DG = (function () {
       // --- preset-kort ---
       function renderPresetCards() {
         const wrap = document.getElementById('preset-cards');
+        // bevar brukerens valg ved re-render (språkbytte)
+        const prevChecked = {}, prevParams = {};
+        wrap.querySelectorAll('input[type=checkbox][data-preset]').forEach(cb => { prevChecked[cb.dataset.preset] = cb.checked; });
+        wrap.querySelectorAll('input[data-preset][data-param]').forEach(inp => { prevParams[inp.dataset.preset + '.' + inp.dataset.param] = inp.value; });
         wrap.textContent = '';
         for (const preset of DG.PRESETS) {
           const card = el('div', 'card');
           const head = el('label', null);
           const cb = el('input');
-          cb.type = 'checkbox'; cb.checked = true; cb.dataset.preset = preset.id;
+          cb.type = 'checkbox'; cb.checked = prevChecked[preset.id] ?? true; cb.dataset.preset = preset.id;
           head.appendChild(cb);
           head.appendChild(el('strong', null, ' ' + (U.state.lang === 'no' ? preset.nameNo : preset.nameEn)));
           card.appendChild(head);
           for (const prm of preset.params) {
             const lab = el('label', null, (U.state.lang === 'no' ? prm.labelNo : prm.labelEn) + ' ');
             const inp = el('input');
-            inp.type = 'number'; inp.value = prm.default;
+            inp.type = 'number'; inp.value = prevParams[preset.id + '.' + prm.key] ?? prm.default;
             inp.min = prm.min; inp.max = prm.max; inp.step = prm.step;
             inp.dataset.preset = preset.id; inp.dataset.param = prm.key;
             inp.style.width = '5rem';
