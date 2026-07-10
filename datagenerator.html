@@ -1389,6 +1389,216 @@ window.DG = (function () {
         U.downloadBlob('syntetiske_data.zip', blob);
       });
     })();
+
+    // --- Task 11: Fane 2 — Bygg selv ---
+    (function () {
+      'use strict';
+      const DG = window.DG;
+      const U = window._ui;
+      const { el, t } = U;
+      let table = null;
+
+      const TYPES = ['recipe', 'example', 'regex', 'list', 'number', 'date', 'sequence', 'constant'];
+      const PARAM_FIELDS = {
+        recipe: [{ key: 'pattern', kind: 'text', ph: '[A,B][x,y;p=(0.8,0.2)][1-3]' }],
+        example: [{ key: 'pattern', kind: 'text', ph: 'K50.1' }],
+        regex: [{ key: 'pattern', kind: 'text', ph: '[A-Z]\\d{2}\\.\\d' }],
+        list: [{ key: 'values', kind: 'textarea', ph: 'a\nb\nc' }, { key: 'weights', kind: 'text', ph: '0.5, 0.3, 0.2' }],
+        number: [{ key: 'dist', kind: 'select', options: ['uniform', 'normal'] }, { key: 'min', kind: 'number' }, { key: 'max', kind: 'number' }, { key: 'mean', kind: 'number' }, { key: 'sd', kind: 'number' }, { key: 'decimals', kind: 'number' }],
+        date: [{ key: 'from', kind: 'text', ph: '2015-01-01' }, { key: 'to', kind: 'text', ph: '2024-12-31' }],
+        sequence: [{ key: 'start', kind: 'number' }, { key: 'step', kind: 'number' }],
+        constant: [{ key: 'value', kind: 'text' }]
+      };
+
+      function defaultCol() {
+        return { name: 'col_' + (U.state.builderCols.length + 1), type: 'recipe', params: { pattern: '[A-C][1-9]' } };
+      }
+
+      function saveLocal() {
+        try { localStorage.setItem('dg_builder_v1', JSON.stringify({ cols: U.state.builderCols })); } catch (e) { /* privat modus o.l. */ }
+      }
+      function loadLocal() {
+        try {
+          const raw = localStorage.getItem('dg_builder_v1');
+          if (raw) { const d = JSON.parse(raw); if (Array.isArray(d.cols)) U.state.builderCols = d.cols; }
+        } catch (e) { /* korrupt lagring ignoreres */ }
+      }
+
+      // params <-> inputverdier. list.values lagres som array; i UI vises én per linje.
+      function paramToInput(spec, key) {
+        const v = (spec.params || {})[key];
+        if (key === 'values' && Array.isArray(v)) return v.join('\n');
+        if (key === 'weights' && Array.isArray(v)) return v.join(', ');
+        return v ?? '';
+      }
+      function inputToParam(spec, key, raw) {
+        if (raw === '' || raw == null) { delete spec.params[key]; return; }
+        if (key === 'values') spec.params.values = String(raw).split('\n').map(s => s.trim()).filter(Boolean);
+        else if (key === 'weights') spec.params.weights = String(raw).split(',').map(s => parseFloat(s.trim())).filter(x => !isNaN(x));
+        else if (key === 'dist' || key === 'pattern' || key === 'from' || key === 'to' || key === 'value') spec.params[key] = String(raw);
+        else spec.params[key] = Number(raw);
+      }
+
+      function renderCols() {
+        const wrap = document.getElementById('builder-cols');
+        wrap.textContent = '';
+        U.state.builderCols.forEach((spec, idx) => {
+          const card = el('div', 'card');
+          const row = el('div', 'field-row');
+
+          const nameLab = el('label', null, t('colName'));
+          const nameInp = el('input'); nameInp.value = spec.name;
+          nameInp.addEventListener('input', () => { spec.name = nameInp.value; onChange(false); });
+          nameLab.appendChild(nameInp); row.appendChild(nameLab);
+
+          const typeLab = el('label', null, t('colType'));
+          const typeSel = el('select');
+          for (const ty of TYPES) {
+            const o = el('option', null, U.T[U.state.lang].typeNames[ty]); o.value = ty;
+            if (ty === spec.type) o.selected = true;
+            typeSel.appendChild(o);
+          }
+          typeSel.addEventListener('change', () => { spec.type = typeSel.value; spec.params = {}; renderCols(); onChange(false); });
+          typeLab.appendChild(typeSel); row.appendChild(typeLab);
+
+          for (const f of PARAM_FIELDS[spec.type]) {
+            const lab = el('label', null, f.key);
+            let inp;
+            if (f.kind === 'textarea') { inp = el('textarea'); inp.rows = 3; }
+            else if (f.kind === 'select') {
+              inp = el('select');
+              for (const opt of f.options) { const o = el('option', null, opt); o.value = opt; inp.appendChild(o); }
+            } else { inp = el('input'); if (f.kind === 'number') inp.type = 'number'; }
+            if (f.ph) inp.placeholder = f.ph;
+            inp.value = paramToInput(spec, f.key);
+            inp.addEventListener('input', () => { inputToParam(spec, f.key, inp.value); onChange(true, card, idx); });
+            lab.appendChild(inp); row.appendChild(lab);
+          }
+
+          const tieLab = el('label', null, t('tieTo'));
+          const tieSel = el('select');
+          tieSel.appendChild(el('option', null, '—')).value = '';
+          U.state.builderCols.slice(0, idx).forEach(c => {
+            const o = el('option', null, c.name); o.value = c.name;
+            if (c.name === spec.tieTo) o.selected = true;
+            tieSel.appendChild(o);
+          });
+          tieSel.addEventListener('change', () => { spec.tieTo = tieSel.value || undefined; onChange(false); });
+          tieLab.appendChild(tieSel); row.appendChild(tieLab);
+
+          const misLab = el('label', null, t('missing'));
+          const misInp = el('input'); misInp.type = 'number'; misInp.min = 0; misInp.max = 100; misInp.style.width = '4.5rem';
+          misInp.value = spec.missing ? Math.round(spec.missing * 100) : '';
+          misInp.addEventListener('input', () => {
+            const pct = parseFloat(misInp.value);
+            if (isNaN(pct) || pct <= 0) delete spec.missing; else spec.missing = Math.min(pct, 100) / 100;
+            onChange(false);
+          });
+          misLab.appendChild(misInp); row.appendChild(misLab);
+
+          const del = el('button', 'ghost', t('delete'));
+          del.addEventListener('click', () => { U.state.builderCols.splice(idx, 1); renderCols(); onChange(false); });
+          row.appendChild(del);
+
+          card.appendChild(row);
+          card.appendChild(el('div', 'sample', ''));
+          card.appendChild(el('div', 'error-text', ''));
+          wrap.appendChild(card);
+        });
+        updateSamples();
+      }
+      U.dynamicRenderers.push(renderCols);
+
+      // live-eksempler: 5 rader med fast seed, felles for alle kolonner (tieTo trenger naboene)
+      function updateSamples() {
+        const wrap = document.getElementById('builder-cols');
+        const ds = DG.buildDataset(U.state.builderCols, 5, 'sample');
+        [...wrap.children].forEach((card, idx) => {
+          const spec = U.state.builderCols[idx];
+          const sample = card.querySelector('.sample');
+          const err = card.querySelector('.error-text');
+          const e = ds.errors.find(x => x.column === spec.name);
+          if (e) { sample.textContent = ''; err.textContent = e.message; }
+          else { err.textContent = ''; sample.textContent = (ds.columns[spec.name] || []).join('  ·  '); }
+        });
+      }
+
+      let sampleTimer = null;
+      function onChange(debounce) {
+        saveLocal();
+        if (debounce) { clearTimeout(sampleTimer); sampleTimer = setTimeout(updateSamples, 250); }
+        else updateSamples();
+      }
+
+      // --- generering og eksport ---
+      function generate() {
+        const ds = DG.buildDataset(U.state.builderCols, U.getN(), U.getSeed());
+        U.state.builderResult = ds;
+        const errBox = document.getElementById('builder-errors');
+        errBox.textContent = '';
+        ds.errors.forEach(e => errBox.appendChild(el('div', 'error-text', e.column + ': ' + e.message)));
+        document.getElementById('builder-export').hidden = false;
+        document.getElementById('builder-rowinfo').textContent = ds.rows.length + ' ' + t('rows');
+        if (table) { table.destroy(); table = null; }
+        table = new Tabulator('#builder-table', {
+          data: ds.rows.slice(0, 50), autoColumns: true, layout: 'fitDataStretch', height: '420px'
+        });
+      }
+      document.getElementById('btn-generate-builder').addEventListener('click', generate);
+      document.getElementById('btn-add-col').addEventListener('click', () => {
+        U.state.builderCols.push(defaultCol()); renderCols(); saveLocal();
+      });
+      document.getElementById('btn-dl-builder-csv').addEventListener('click', () => {
+        if (U.state.builderResult) U.downloadCsv('egendefinert', U.state.builderResult);
+      });
+      document.getElementById('btn-dl-builder-json').addEventListener('click', () => {
+        if (!U.state.builderResult) return;
+        U.downloadBlob('egendefinert.json',
+          new Blob([JSON.stringify(U.state.builderResult.rows, null, 1)], { type: 'application/json' }));
+      });
+      document.getElementById('btn-copy-builder').addEventListener('click', function () {
+        if (!U.state.builderResult) return;
+        const ds = U.state.builderResult;
+        navigator.clipboard.writeText(DG.toCsv(ds.order, ds.rows)).then(() => {
+          this.textContent = t('copied');
+          setTimeout(() => { this.textContent = t('copy'); }, 1500);
+        });
+      });
+
+      // --- lagre/laste oppskrift ---
+      document.getElementById('btn-save-spec').addEventListener('click', () => {
+        U.downloadBlob('oppskrift.json',
+          new Blob([JSON.stringify({ cols: U.state.builderCols }, null, 1)], { type: 'application/json' }));
+      });
+      document.getElementById('inp-load-spec').addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+        file.text().then(text => {
+          try {
+            const d = JSON.parse(text);
+            if (!Array.isArray(d.cols)) throw new Error('mangler cols');
+            U.state.builderCols = d.cols;
+            renderCols(); saveLocal();
+          } catch (e) {
+            const errBox = document.getElementById('builder-errors');
+            errBox.textContent = '';
+            errBox.appendChild(el('div', 'error-text', 'Kunne ikke lese oppskriften: ' + e.message));
+          }
+        });
+        this.value = '';
+      });
+
+      // --- broen fra fane 1 ---
+      U.openInBuilder = function (specs) {
+        U.state.builderCols = JSON.parse(JSON.stringify(specs));
+        renderCols(); saveLocal();
+      };
+
+      // --- oppstart ---
+      loadLocal();
+      if (!U.state.builderCols.length) U.state.builderCols = [defaultCol()];
+      renderCols();
+    })();
   });
 })();
 </script>
