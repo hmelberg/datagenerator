@@ -277,8 +277,13 @@ window.DG = (function () {
       const kjonn = rng.random() < 0.5 ? '1' : '2';
       const kommune = rng.choice(DG.CODELISTS.kommuner).kode;
       const pDead = age < 50 ? 0.002 : age < 70 ? 0.02 : age < 80 ? 0.08 : 0.25;
-      const dodsdato = rng.random() < pDead
-        ? DG.dateToStr(DG.randomDate(rng, DG.STUDY_FROM, DG.STUDY_TO)) : '';
+      let dodsdato = '';
+      if (rng.random() < pDead) {
+        let dFrom = DG.STUDY_FROM;
+        const birthFrom = String(DG.REF_YEAR - age) + '-01-01';
+        if (birthFrom > dFrom) dFrom = birthFrom;
+        dodsdato = DG.dateToStr(DG.randomDate(rng, dFrom, DG.STUDY_TO));
+      }
       rows.push({
         lopenr: String(i), kjonn, fodselsaar: String(DG.REF_YEAR - age),
         bostedskommune: kommune, dodsdato
@@ -704,7 +709,10 @@ window.DG = (function () {
       const y = Number(p.fodselsaar);
       DG.assert(y >= DG.REF_YEAR - 100 && y <= DG.REF_YEAR, 'fodselsaar ' + p.fodselsaar);
       DG.assert(DG.CODELISTS.kommuner.some(k => k.kode === p.bostedskommune));
-      if (p.dodsdato) DG.assert(p.dodsdato >= DG.STUDY_FROM && p.dodsdato <= DG.STUDY_TO);
+      if (p.dodsdato) {
+        DG.assert(p.dodsdato >= DG.STUDY_FROM && p.dodsdato <= DG.STUDY_TO);
+        DG.assert(p.dodsdato >= p.fodselsaar + '-01-01', 'død før fødsel: ' + p.dodsdato + ' < ' + p.fodselsaar);
+      }
     }
     const dead = pop.filter(p => p.dodsdato).length;
     DG.assert(dead < 100, 'for mange døde: ' + dead);
