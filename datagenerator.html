@@ -1437,7 +1437,7 @@ window.DG = (function () {
       function sanitizeCols(cols) {
         if (!Array.isArray(cols)) return [];
         return cols
-          .filter(c => c && typeof c === 'object' && PARAM_FIELDS[c.type])
+          .filter(c => c && typeof c === 'object' && TYPES.includes(c.type))
           .map(c => ({
             name: String(c.name ?? ''),
             type: c.type,
