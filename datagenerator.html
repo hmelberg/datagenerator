@@ -1242,7 +1242,7 @@ window.DG = (function () {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     }
-    const csvBlob = (ds) => new Blob(['﻿' + DG.toCsv(ds.order, ds.rows)], { type: 'text/csv;charset=utf-8' });
+    const csvBlob = (ds) => new Blob(['\u{FEFF}' + DG.toCsv(ds.order, ds.rows)], { type: 'text/csv;charset=utf-8' });
     const downloadCsv = (basename, ds) => downloadBlob(basename + '.csv', csvBlob(ds));
 
     // --- faner ---
@@ -1432,10 +1432,24 @@ window.DG = (function () {
       function saveLocal() {
         try { localStorage.setItem('dg_builder_v1', JSON.stringify({ cols: U.state.builderCols })); } catch (e) { /* privat modus o.l. */ }
       }
+      // Vasker lagrede/lastede kolonnespesifikasjoner: forkaster ugyldig type,
+      // fyller inn manglende felt. En korrupt lagring skal aldri knekke renderCols().
+      function sanitizeCols(cols) {
+        if (!Array.isArray(cols)) return [];
+        return cols
+          .filter(c => c && typeof c === 'object' && PARAM_FIELDS[c.type])
+          .map(c => ({
+            name: String(c.name ?? ''),
+            type: c.type,
+            params: (c.params && typeof c.params === 'object') ? c.params : {},
+            ...(typeof c.tieTo === 'string' && c.tieTo ? { tieTo: c.tieTo } : {}),
+            ...(typeof c.missing === 'number' && c.missing > 0 ? { missing: Math.min(c.missing, 1) } : {})
+          }));
+      }
       function loadLocal() {
         try {
           const raw = localStorage.getItem('dg_builder_v1');
-          if (raw) { const d = JSON.parse(raw); if (Array.isArray(d.cols)) U.state.builderCols = d.cols; }
+          if (raw) { const d = JSON.parse(raw); U.state.builderCols = sanitizeCols(d.cols); }
         } catch (e) { /* korrupt lagring ignoreres */ }
       }
 
@@ -1558,7 +1572,7 @@ window.DG = (function () {
         errBox.textContent = '';
         ds.errors.forEach(e => errBox.appendChild(el('div', 'error-text', e.column + ': ' + e.message)));
         document.getElementById('builder-export').hidden = false;
-        document.getElementById('builder-rowinfo').textContent = ds.rows.length + ' ' + t('rows');
+        document.getElementById('builder-rowinfo').textContent = U.T[U.state.lang].showingRows(Math.min(50, ds.rows.length), ds.rows.length);
         if (table) { table.destroy(); table = null; }
         table = new Tabulator('#builder-table', {
           data: ds.rows.slice(0, 50), autoColumns: true, layout: 'fitDataStretch', height: '420px'
@@ -1597,7 +1611,8 @@ window.DG = (function () {
           try {
             const d = JSON.parse(text);
             if (!Array.isArray(d.cols)) throw new Error('mangler cols');
-            U.state.builderCols = d.cols;
+            U.state.builderCols = sanitizeCols(d.cols);
+            if (!U.state.builderCols.length) U.state.builderCols = [defaultCol()];
             renderCols(); saveLocal();
           } catch (e) {
             const errBox = document.getElementById('builder-errors');
@@ -1610,7 +1625,8 @@ window.DG = (function () {
 
       // --- broen fra fane 1 ---
       U.openInBuilder = function (specs) {
-        U.state.builderCols = JSON.parse(JSON.stringify(specs));
+        U.state.builderCols = sanitizeCols(JSON.parse(JSON.stringify(specs)));
+        if (!U.state.builderCols.length) U.state.builderCols = [defaultCol()];
         renderCols(); saveLocal();
       };
 
