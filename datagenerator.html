@@ -552,6 +552,141 @@ window.DG = (function () {
       ];
     }
   });
+
+  // --- KUHR (primærhelsetjeneste/fastlege) ---
+  DG.PRESETS.push({
+    id: 'kuhr', nameNo: 'KUHR (fastlegekontakter)', nameEn: 'KUHR (GP contacts)',
+    params: [{ key: 'intensitet', labelNo: 'Intensitet (hendelser)', labelEn: 'Intensity (events)', default: 1, min: 0.2, max: 5, step: 0.2 }],
+    make(pop, rng, params) {
+      const order = ['lopenr', 'dato', 'diagnoseICPC2', 'takstkode', 'refusjonsbelop'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        const lambda = (params.intensitet ?? 1) * (1 + age / 40);
+        const nEv = rng.poisson(lambda);
+        for (let e = 0; e < nEv; e++) {
+          let belop = Math.round(rng.normal(350, 150));
+          if (belop < 50) belop = 50;
+          rows.push({
+            lopenr: p.lopenr,
+            dato: DG.dateToStr(DG.eventDate(rng, p)),
+            diagnoseICPC2: DG.pickCoded(DG.CODELISTS.icpc2, rng, p).kode,
+            takstkode: rng.weightedChoice(DG.CODELISTS.takster, DG.CODELISTS.takster.map(t => t.w)).kode,
+            refusjonsbelop: String(belop)
+          });
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'dato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'diagnoseICPC2', type: 'list', params: { values: DG.CODELISTS.icpc2.map(c => c.kode), weights: DG.CODELISTS.icpc2.map(c => c.w) } },
+        { name: 'takstkode', type: 'list', params: { values: DG.CODELISTS.takster.map(t => t.kode), weights: DG.CODELISTS.takster.map(t => t.w) } },
+        { name: 'refusjonsbelop', type: 'number', params: { dist: 'normal', mean: 350, sd: 150, min: 50 } }
+      ];
+    }
+  });
+
+  // --- SSB (demografi og sosioøkonomi, én rad per person) ---
+  DG.PRESETS.push({
+    id: 'ssb', nameNo: 'SSB (demografi/inntekt)', nameEn: 'Statistics Norway (demographics/income)',
+    params: [],
+    make(pop, rng) {
+      const order = ['lopenr', 'fodselsaar', 'kjonn', 'bostedskommune', 'sivilstand', 'utdanningsnivaa', 'samletInntekt'];
+      const rows = pop.map(p => {
+        const age = DG.ageOf(p);
+        let sivilstand, nus, inntekt;
+        if (age < 18) {
+          sivilstand = '1';
+          nus = age < 6 ? '0' : age < 13 ? '1' : '2';
+          inntekt = 0;
+        } else {
+          sivilstand = rng.weightedChoice(['1', '2', '3', '4', '5'],
+            age < 30 ? [0.8, 0.15, 0, 0.04, 0.01]
+              : age < 67 ? [0.25, 0.5, 0.02, 0.18, 0.05]
+                : [0.1, 0.5, 0.25, 0.14, 0.01]);
+          nus = rng.weightedChoice(['2', '3', '4', '5', '6', '7', '8'],
+            [0.05, 0.15, 0.25, 0.05, 0.3, 0.17, 0.03]);
+          const mean = age < 30 ? 350000 : age < 67 ? 550000 : 300000;
+          inntekt = Math.max(0, Math.round(rng.normal(mean, 150000) / 1000) * 1000);
+        }
+        return {
+          lopenr: p.lopenr, fodselsaar: p.fodselsaar, kjonn: p.kjonn,
+          bostedskommune: p.bostedskommune, sivilstand,
+          utdanningsnivaa: nus, samletInntekt: String(inntekt)
+        };
+      });
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'fodselsaar', type: 'number', params: { min: 1924, max: 2024 } },
+        { name: 'kjonn', type: 'list', params: { values: ['1', '2'] } },
+        { name: 'bostedskommune', type: 'list', params: { values: DG.CODELISTS.kommuner.map(k => k.kode) } },
+        { name: 'sivilstand', type: 'list', params: { values: DG.CODELISTS.sivilstand.map(s => s.kode) } },
+        { name: 'utdanningsnivaa', type: 'list', params: { values: DG.CODELISTS.nus } },
+        { name: 'samletInntekt', type: 'number', params: { dist: 'normal', mean: 500000, sd: 150000, min: 0 } }
+      ];
+    }
+  });
+
+  // --- FD-trygd (trygdespell) ---
+  DG.PRESETS.push({
+    id: 'fdtrygd', nameNo: 'FD-trygd (trygdeytelser)', nameEn: 'FD-trygd (welfare benefits)',
+    params: [],
+    make(pop, rng) {
+      const order = ['lopenr', 'fomDato', 'tomDato', 'ytelse', 'uforegrad'];
+      const rows = [];
+      for (const p of pop) {
+        const age = DG.ageOf(p);
+        if (age < 18 || age > 67) continue;
+        // uføretrygd: sannsynlighet stiger med alder; løpende (tomDato tom)
+        const pUfor = age < 40 ? 0.02 : 0.05 + (age - 40) * 0.01;
+        if (rng.random() < pUfor) {
+          rows.push({
+            lopenr: p.lopenr,
+            fomDato: DG.dateToStr(DG.eventDate(rng, p)),
+            tomDato: p.dodsdato || '',
+            ytelse: 'uforetrygd',
+            uforegrad: rng.weightedChoice(['50', '100'], [0.4, 0.6])
+          });
+          continue; // uføre får ikke andre ytelser i denne forenklingen
+        }
+        // sykepenger: kortere spell, kan ha flere
+        const nSyk = rng.poisson(0.3);
+        for (let s = 0; s < nSyk; s++) {
+          const fom = DG.eventDate(rng, p);
+          let tom = new Date(fom.getTime() + rng.randint(14, 250) * 86400000);
+          const cap = p.dodsdato || DG.STUDY_TO;
+          if (DG.dateToStr(tom) > cap) tom = new Date(Date.parse(cap));
+          rows.push({ lopenr: p.lopenr, fomDato: DG.dateToStr(fom), tomDato: DG.dateToStr(tom), ytelse: 'sykepenger', uforegrad: '' });
+        }
+        // dagpenger og AAP: lav sannsynlighet
+        for (const yt of ['dagpenger', 'AAP']) {
+          if (rng.random() < 0.06) {
+            const fom = DG.eventDate(rng, p);
+            let tom = new Date(fom.getTime() + rng.randint(30, 365) * 86400000);
+            const cap = p.dodsdato || DG.STUDY_TO;
+            if (DG.dateToStr(tom) > cap) tom = new Date(Date.parse(cap));
+            rows.push({ lopenr: p.lopenr, fomDato: DG.dateToStr(fom), tomDato: DG.dateToStr(tom), ytelse: yt, uforegrad: '' });
+          }
+        }
+      }
+      return { order, rows };
+    },
+    builderSpec() {
+      return [
+        { name: 'lopenr', type: 'sequence', params: {} },
+        { name: 'fomDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'tomDato', type: 'date', params: { from: DG.STUDY_FROM, to: DG.STUDY_TO } },
+        { name: 'ytelse', type: 'list', params: { values: DG.CODELISTS.ytelser } },
+        { name: 'uforegrad', type: 'list', params: { values: ['50', '100'] }, missing: 0.8 }
+      ];
+    }
+  });
 })(window.DG);
 </script>
 
@@ -871,6 +1006,66 @@ window.DG = (function () {
       DG.assert(Number(r.ddd) > 0 && Number(r.antallPakninger) >= 1);
       const person = byId[r.lopenr];
       if (person.dodsdato) DG.assert(r.utleveringsDato <= person.dodsdato, 'utlevering etter død');
+    }
+  });
+  DG.test('kuhr: koblbar og gyldige ICPC-2-koder', () => {
+    const rng = DG.makeRng(41);
+    const pop = DG.makePopulation(200, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'kuhr').make(pop, rng, { intensitet: 1 });
+    DG.assertEq(ds.order, ['lopenr', 'dato', 'diagnoseICPC2', 'takstkode', 'refusjonsbelop']);
+    DG.assert(ds.rows.length > 100);
+    for (const r of ds.rows) {
+      DG.assert(byId[r.lopenr]);
+      DG.assert(DG.CODELISTS.icpc2.some(c => c.kode === r.diagnoseICPC2), 'ukjent ICPC-2 ' + r.diagnoseICPC2);
+      DG.assert(DG.CODELISTS.takster.some(c => c.kode === r.takstkode));
+      DG.assert(Number(r.refusjonsbelop) >= 50);
+      const person = byId[r.lopenr];
+      if (person.dodsdato) DG.assert(r.dato <= person.dodsdato, 'kontakt etter død');
+    }
+  });
+  DG.test('ssb: én rad per person, konsistent med populasjonen', () => {
+    const rng = DG.makeRng(42);
+    const pop = DG.makePopulation(150, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'ssb').make(pop, rng, {});
+    DG.assertEq(ds.order, ['lopenr', 'fodselsaar', 'kjonn', 'bostedskommune', 'sivilstand', 'utdanningsnivaa', 'samletInntekt']);
+    DG.assertEq(ds.rows.length, 150);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    for (const r of ds.rows) {
+      DG.assertEq(r.fodselsaar, byId[r.lopenr].fodselsaar, 'fodselsaar avviker fra populasjonen');
+      DG.assertEq(r.kjonn, byId[r.lopenr].kjonn);
+      DG.assert(DG.CODELISTS.sivilstand.some(s => s.kode === r.sivilstand));
+      DG.assert(DG.CODELISTS.nus.includes(r.utdanningsnivaa));
+    }
+  });
+  DG.test('ssb: barn har 0 i inntekt og er ugift', () => {
+    const rng = DG.makeRng(43);
+    const pop = DG.makePopulation(400, rng);
+    const ds = DG.PRESETS.find(x => x.id === 'ssb').make(pop, rng, {});
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    for (const r of ds.rows) {
+      if (DG.ageOf(byId[r.lopenr]) < 18) {
+        DG.assertEq(r.samletInntekt, '0', 'barn med inntekt');
+        DG.assertEq(r.sivilstand, '1', 'barn ikke ugift');
+      }
+    }
+  });
+  DG.test('fdtrygd: uforegrad bare ved uforetrygd, gyldige ytelser', () => {
+    const rng = DG.makeRng(44);
+    const pop = DG.makePopulation(500, rng);
+    const byId = Object.fromEntries(pop.map(p => [p.lopenr, p]));
+    const ds = DG.PRESETS.find(x => x.id === 'fdtrygd').make(pop, rng, {});
+    DG.assertEq(ds.order, ['lopenr', 'fomDato', 'tomDato', 'ytelse', 'uforegrad']);
+    DG.assert(ds.rows.length > 20, 'for få trygdespell: ' + ds.rows.length);
+    for (const r of ds.rows) {
+      DG.assert(DG.CODELISTS.ytelser.includes(r.ytelse), 'ukjent ytelse ' + r.ytelse);
+      if (r.ytelse === 'uforetrygd') {
+        DG.assert(r.uforegrad === '50' || r.uforegrad === '100');
+        DG.assert(DG.ageOf(byId[r.lopenr]) >= 18, 'uforetrygd til barn');
+      } else {
+        DG.assertEq(r.uforegrad, '');
+        DG.assert(r.tomDato >= r.fomDato, 'tomDato før fomDato');
+      }
     }
   });
 })(window.DG);
