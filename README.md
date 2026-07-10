@@ -3,14 +3,14 @@
 Syntetiske norske registerdata (NPR, Legemiddelregisteret, KUHR, SSB, FD-trygd)
 og egendefinerte testdatasett — i én selvstendig HTML-side.
 
-**Bruk:** åpne `datagenerator.html` i en nettleser (eller legg den på GitHub
+**Bruk:** åpne `index.html` i en nettleser (eller legg den på GitHub
 Pages/Netlify). Velg registre og trykk Generer, eller bygg egne kolonner i
 «Bygg selv»-fanen. Alle registerfiler kan kobles på `lopenr`. Samme seed gir
 identiske data. Dataene er 100 % syntetiske.
 
 **Utvikling:** motoren er ren JS i `<script data-node-testable>`-blokker;
 kjør testene med `node tests/run_tests.mjs`. Selvtest i nettleser:
-`datagenerator.html?selftest`.
+`index.html?selftest`.
 
 ---
 

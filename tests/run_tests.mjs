@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const html = readFileSync(new URL('../datagenerator.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const blocks = [...html.matchAll(/<script data-node-testable>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 if (!blocks.length) { console.error('FEIL: fant ingen <script data-node-testable>-blokker'); process.exit(1); }
 
