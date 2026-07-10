@@ -114,6 +114,95 @@ window.DG = (function () {
     }
   };
 
+  // --- oppskriftsspråket ---
+  DG._parseGroup = function (inner) {
+    let expr = inner, probPart = null;
+    const pIdx = inner.indexOf(';p=');
+    if (pIdx >= 0) { expr = inner.slice(0, pIdx); probPart = inner.slice(pIdx + 3); }
+    const rawOptions = expr.split(',').map(s => s.trim());
+    if (!rawOptions.length || rawOptions.every(s => s === '')) throw new Error('tom gruppe: [' + inner + ']');
+    const perRaw = []; let options = [];
+    for (const opt of rawOptions) {
+      const m = opt.match(/^(\w+)-(\w+)$/);
+      let expanded;
+      if (m && /^\d+$/.test(m[1]) && /^\d+$/.test(m[2]) && (m[1].length > 1 || m[2].length > 1)) {
+        expanded = [];
+        for (let v = parseInt(m[1], 10); v <= parseInt(m[2], 10); v++) expanded.push(String(v));
+      } else if (m && m[1].length === 1 && m[2].length === 1) {
+        expanded = [];
+        for (let c = m[1].charCodeAt(0); c <= m[2].charCodeAt(0); c++) expanded.push(String.fromCharCode(c));
+      } else {
+        expanded = [opt];
+      }
+      if (!expanded.length) throw new Error('ugyldig intervall: ' + opt + ' i [' + inner + ']');
+      perRaw.push(expanded); options = options.concat(expanded);
+    }
+    let weights = null;
+    if (probPart !== null) {
+      const pm = probPart.match(/^\(([^)]*)\)$/);
+      if (!pm) throw new Error('ugyldig p= i [' + inner + '] — forventet p=(...)');
+      const ps = pm[1].split(',').map(s => parseFloat(s.trim()));
+      if (ps.some(isNaN)) throw new Error('ugyldig sannsynlighet i [' + inner + ']');
+      if (ps.length === 1) {
+        weights = options.map(() => ps[0] / options.length);
+      } else {
+        if (ps.length !== perRaw.length) throw new Error('antall sannsynligheter (' + ps.length + ') matcher ikke antall valg (' + perRaw.length + ') i [' + inner + ']');
+        weights = [];
+        perRaw.forEach((group, i) => group.forEach(() => weights.push(ps[i] / group.length)));
+      }
+      const sum = weights.reduce((a, b) => a + b, 0);
+      if (sum > 1.000001) throw new Error('sannsynlighetene summerer til mer enn 1 i [' + inner + ']');
+      if (sum < 0.999999) { options = options.concat(['']); weights = weights.concat([1 - sum]); }
+    }
+    return { options, weights };
+  };
+
+  DG.parseRecipe = function (pattern) {
+    if (!pattern || !String(pattern).trim()) throw new Error('tomt mønster');
+    const segs = [];
+    const re = /\[([^\]]*)\]|([^\[\]]+)/g;
+    let m;
+    while ((m = re.exec(String(pattern))) !== null) {
+      if (m[2] !== undefined) segs.push({ literal: m[2] });
+      else segs.push(DG._parseGroup(m[1]));
+    }
+    return segs;
+  };
+
+  DG.recipeValue = (segs, rng) => segs.map(s =>
+    s.literal !== undefined ? s.literal
+      : (s.weights ? rng.weightedChoice(s.options, s.weights) : rng.choice(s.options))
+  ).join('');
+
+  // --- eksempel-mønster: etterlign formen på ett eksempel ---
+  DG.exampleValue = function (pattern, rng) {
+    let out = '';
+    for (const ch of String(pattern)) {
+      if (/[0-9]/.test(ch)) out += String(rng.randint(0, 9));
+      else if (/[A-Z]/.test(ch)) out += String.fromCharCode(65 + rng.randint(0, 25));
+      else if (/[a-z]/.test(ch)) out += String.fromCharCode(97 + rng.randint(0, 25));
+      else out += ch;
+    }
+    return out;
+  };
+
+  DG.regexLib = null; // settes av UI (RandExp) eller testrigg (stub)
+
+  DG.generators.recipe = (n, p, rng) => {
+    const segs = DG.parseRecipe(p.pattern);
+    return Array.from({ length: n }, () => DG.recipeValue(segs, rng));
+  };
+  DG.generators.example = (n, p, rng) => {
+    if (!p.pattern) throw new Error('eksempel-mønster mangler');
+    return Array.from({ length: n }, () => DG.exampleValue(p.pattern, rng));
+  };
+  DG.generators.regex = (n, p, rng) => {
+    if (!DG.regexLib) throw new Error('regex-biblioteket (randexp) er ikke lastet');
+    const rx = new DG.regexLib(new RegExp(p.pattern));
+    rx.randInt = (a, b) => rng.randint(a, b); // seeded i stedet for Math.random
+    return Array.from({ length: n }, () => String(rx.gen()));
+  };
+
   return DG;
 })();
 </script>
@@ -199,6 +288,67 @@ window.DG = (function () {
     let threw = false;
     try { DG.generators.list(3, { values: [] }, DG.makeRng(1)); } catch (e) { threw = true; }
     DG.assert(threw, 'skulle kastet Error');
+  });
+
+  DG.test('recipe: range er inklusiv', () => {
+    const segs = DG.parseRecipe('[a-c]');
+    DG.assertEq(segs[0].options, ['a', 'b', 'c']);
+  });
+  DG.test('recipe: heltalls-range med flere sifre', () => {
+    DG.assertEq(DG.parseRecipe('[9-11]')[0].options, ['9', '10', '11']);
+  });
+  DG.test('recipe: opsjonsliste og literal utenfor klammer', () => {
+    const rng = DG.makeRng(1);
+    const segs = DG.parseRecipe('[A,B]-[1,1]');
+    const v = DG.recipeValue(segs, rng);
+    DG.assert(/^[AB]-1$/.test(v), 'fikk ' + v);
+  });
+  DG.test('recipe: blandet range og opsjon', () => {
+    DG.assertEq(DG.parseRecipe('[a-b,x]')[0].options, ['a', 'b', 'x']);
+  });
+  DG.test('recipe: enkel p spres og gir tom-opsjon', () => {
+    const seg = DG.parseRecipe('[a,b;p=(0.5)]')[0];
+    DG.assertEq(seg.options, ['a', 'b', '']);
+    DG.assertEq(seg.weights.map(w => Math.round(w * 100) / 100), [0.25, 0.25, 0.5]);
+  });
+  DG.test('recipe: p per opsjon, sum 1 gir ingen tom-opsjon', () => {
+    const seg = DG.parseRecipe('[a,b;p=(0.1,0.9)]')[0];
+    DG.assertEq(seg.options, ['a', 'b']);
+  });
+  DG.test('recipe: p-sum over 1 kaster feil', () => {
+    let threw = false;
+    try { DG.parseRecipe('[a,b;p=(0.8,0.9)]'); } catch (e) { threw = true; }
+    DG.assert(threw);
+  });
+  DG.test('recipe: anvil-eksempelet fungerer', () => {
+    const segs = DG.parseRecipe('[A,B][x,y,z;p=(0.8,0.1,0.1)][1-3][.][0-9]');
+    const rng = DG.makeRng(2);
+    for (let i = 0; i < 30; i++) {
+      const v = DG.recipeValue(segs, rng);
+      DG.assert(/^[AB][xyz][1-3]\.\d$/.test(v), 'fikk ' + v);
+    }
+  });
+  DG.test('recipe: generator gir n verdier', () => {
+    DG.assertEq(DG.generators.recipe(4, { pattern: '[1-2]' }, DG.makeRng(1)).length, 4);
+  });
+  DG.test('example: K50.1 gir samme form', () => {
+    const rng = DG.makeRng(3);
+    for (let i = 0; i < 20; i++) {
+      const v = DG.exampleValue('K50.1', rng);
+      DG.assert(/^[A-Z]\d\d\.\d$/.test(v), 'fikk ' + v);
+    }
+  });
+  DG.test('regex: koblet mot DG.regexLib', () => {
+    const vals = DG.generators.regex(3, { pattern: 'A\\d' }, DG.makeRng(1));
+    DG.assertEq(vals.length, 3);
+    for (const v of vals) DG.assert(typeof v === 'string' && v.length > 0);
+  });
+  DG.test('regex: kaster hvis lib mangler', () => {
+    const saved = DG.regexLib; DG.regexLib = null;
+    let threw = false;
+    try { DG.generators.regex(1, { pattern: 'A' }, DG.makeRng(1)); } catch (e) { threw = true; }
+    DG.regexLib = saved;
+    DG.assert(threw);
   });
 })(window.DG);
 </script>
