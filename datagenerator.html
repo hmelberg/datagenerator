@@ -88,6 +88,32 @@ window.DG = (function () {
     return new Date(a + rng.random() * (b - a));
   };
 
+  // --- kolonnegeneratorer: (n, params, rng) -> string[] ---
+  DG.generators = {
+    sequence: (n, p) => {
+      const start = p.start ?? 1, step = p.step ?? 1;
+      return Array.from({ length: n }, (_, i) => String(start + i * step));
+    },
+    constant: (n, p) => Array.from({ length: n }, () => String(p.value ?? '')),
+    number: (n, p, rng) => Array.from({ length: n }, () => {
+      let v = (p.dist === 'normal')
+        ? rng.normal(p.mean ?? 50, p.sd ?? 10)
+        : rng.uniform(p.min ?? 0, p.max ?? 100);
+      if (p.min !== undefined && v < p.min) v = p.min;
+      if (p.max !== undefined && v > p.max) v = p.max;
+      return v.toFixed(p.decimals ?? 0);
+    }),
+    date: (n, p, rng) => {
+      if (!p.from || !p.to) throw new Error('dato krever from og to');
+      return Array.from({ length: n }, () => DG.dateToStr(DG.randomDate(rng, p.from, p.to)));
+    },
+    list: (n, p, rng) => {
+      if (!p.values || !p.values.length) throw new Error('liste uten verdier');
+      const w = (p.weights && p.weights.length === p.values.length) ? p.weights : null;
+      return Array.from({ length: n }, () => String(w ? rng.weightedChoice(p.values, w) : rng.choice(p.values)));
+    }
+  };
+
   return DG;
 })();
 </script>
@@ -134,6 +160,45 @@ window.DG = (function () {
       const s = DG.dateToStr(DG.randomDate(rng, '2020-01-01', '2020-12-31'));
       DG.assert(s >= '2020-01-01' && s <= '2020-12-31', 'fikk ' + s);
     }
+  });
+
+  DG.test('sequence: 1,2,3 som strenger', () => {
+    DG.assertEq(DG.generators.sequence(3, {}, DG.makeRng(1)), ['1', '2', '3']);
+  });
+  DG.test('sequence: start og step', () => {
+    DG.assertEq(DG.generators.sequence(3, { start: 10, step: 5 }, DG.makeRng(1)), ['10', '15', '20']);
+  });
+  DG.test('constant', () => {
+    DG.assertEq(DG.generators.constant(2, { value: 'x' }, DG.makeRng(1)), ['x', 'x']);
+  });
+  DG.test('number uniform: heltall innenfor grenser', () => {
+    const vals = DG.generators.number(100, { min: 10, max: 20 }, DG.makeRng(3));
+    for (const v of vals) { const x = Number(v); DG.assert(x >= 10 && x <= 20 && Number.isInteger(x), 'fikk ' + v); }
+  });
+  DG.test('number normal: klippes til min/max', () => {
+    const vals = DG.generators.number(200, { dist: 'normal', mean: 0, sd: 100, min: -10, max: 10 }, DG.makeRng(3));
+    for (const v of vals) { const x = Number(v); DG.assert(x >= -10 && x <= 10, 'fikk ' + v); }
+  });
+  DG.test('number: decimals gir fast antall desimaler', () => {
+    const vals = DG.generators.number(5, { min: 0, max: 1, decimals: 2 }, DG.makeRng(3));
+    for (const v of vals) DG.assert(/^\d+\.\d\d$/.test(v), 'fikk ' + v);
+  });
+  DG.test('date: innenfor intervall og riktig format', () => {
+    const vals = DG.generators.date(50, { from: '2019-06-01', to: '2019-06-30' }, DG.makeRng(4));
+    for (const v of vals) DG.assert(/^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '2019-06-01' && v <= '2019-06-30', 'fikk ' + v);
+  });
+  DG.test('list: trekker bare fra values', () => {
+    const vals = DG.generators.list(50, { values: ['a', 'b'] }, DG.makeRng(5));
+    for (const v of vals) DG.assert(v === 'a' || v === 'b');
+  });
+  DG.test('list: vekter respekteres (vekt 0 velges aldri)', () => {
+    const vals = DG.generators.list(50, { values: ['a', 'b'], weights: [1, 0] }, DG.makeRng(5));
+    for (const v of vals) DG.assertEq(v, 'a');
+  });
+  DG.test('list: tom liste kaster feil', () => {
+    let threw = false;
+    try { DG.generators.list(3, { values: [] }, DG.makeRng(1)); } catch (e) { threw = true; }
+    DG.assert(threw, 'skulle kastet Error');
   });
 })(window.DG);
 </script>
